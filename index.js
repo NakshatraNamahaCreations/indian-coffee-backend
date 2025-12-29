@@ -40,6 +40,7 @@ const TraderRoute = require("./Route/Trader");
 const BidRoute = require("./Route/Bid");
 const DailymarketcategoryRoute = require("./Route/Dailynarketcategory");
 const favoriteRoute = require("./Route/Favurite");
+const PaymentRoute = require("./Route/Payment");
 
 app.use("/api", adminRoute);
 app.use("/api", categoryRoute);
@@ -54,6 +55,7 @@ app.use("/api", TraderRoute);
 app.use("/api/bids", BidRoute);
 app.use("/api/dailymarket-category", DailymarketcategoryRoute);
 app.use("/api/favorite", favoriteRoute);
+app.use("/api/payment", PaymentRoute);
 
 
 const PORT = process.env.PORT || 8000;

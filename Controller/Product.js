@@ -3,6 +3,7 @@ const Category = require("../Modal/Category");
 const Subcategory = require("../Modal/Subcategory");
 const Subsubcategory = require("../Modal/Subsubcategory");
 const WeightUnit = require("../Modal/Weightunit");
+const Payment = require("../Modal/Payment");
 
 
 exports.createProduct = async (req, res) => {
@@ -275,5 +276,77 @@ exports.getProductsBySubSubcategory = async (req, res) => {
             success: false,
             message: err.message
         });
+    }
+};
+
+// After Payment
+
+exports.lockProductAfterPayment = async (req, res) => {
+    try {
+        const { userId, productId, paymentId, orderId } = req.body;
+
+        if (!userId || !productId || !paymentId) {
+            return res.status(400).json({ error: "Missing payment data" });
+        }
+
+        const product = await Product.findById(productId);
+        if (!product) {
+            return res.status(404).json({ error: "Product not found" });
+        }
+
+        // Check if already locked
+        if (
+            product.lockedBy &&
+            product.lockExpiresAt &&
+            product.lockExpiresAt > new Date()
+        ) {
+            return res.status(403).json({ error: "Product already locked" });
+        }
+
+        // 💾 Save payment
+        await Payment.create({
+            userId,
+            productId,
+            amount: 99,
+            paymentId,
+            orderId,
+            status: "success"
+        });
+
+        // 🔒 Lock product for 20 mins
+        product.lockedBy = userId;
+        product.lockExpiresAt = new Date(Date.now() + 20 * 60 * 1000);
+
+        await product.save();
+
+        res.json({
+            success: true,
+            message: "Payment success & product locked",
+            lockExpiresAt: product.lockExpiresAt
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+exports.getProductLockStatus = async (req, res) => {
+    try {
+        const product = await Product.findById(req.params.productId)
+            .select("lockedBy lockExpiresAt");
+
+        if (
+            product?.lockedBy &&
+            product.lockExpiresAt > new Date()
+        ) {
+            return res.json({
+                locked: true,
+                lockedBy: product.lockedBy,
+                lockExpiresAt: product.lockExpiresAt
+            });
+        }
+
+        res.json({ locked: false });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 };

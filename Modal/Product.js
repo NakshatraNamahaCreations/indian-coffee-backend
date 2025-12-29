@@ -46,6 +46,15 @@ const productSchema = new mongoose.Schema(
         productImage: { type: String },
 
         agreeTermsAndCondition: { type: Boolean, default: false },
+        lockedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Trader",
+            default: null
+        },
+        lockExpiresAt: {
+            type: Date,
+            default: null
+        },
 
         status: { type: String, enum: ["Active", "Inactive"], default: "Inactive" },
     },

@@ -35,5 +35,10 @@ router.get(
     "/product/subsubcategory/:subsubcategoryId",
     controller.getProductsBySubSubcategory
 );
+// Payment 99
+
+router.post("/lock-after-payment", controller.lockProductAfterPayment);
+
+router.get("/lock/:productId", controller.getProductLockStatus);
 
 module.exports = router;
