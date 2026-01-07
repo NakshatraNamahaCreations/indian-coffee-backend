@@ -37,8 +37,10 @@ router.post("/traderregister1", ctrl.register1);
 router.put("/:id", cpUpload, ctrl.edit);
 router.post("/traderlogin", ctrl.login);
 router.get("/", ctrl.getAll);
-router.get("/:id", ctrl.getById);
+router.get("/trader/byid/:id", ctrl.getById);
 router.delete("/:id", ctrl.delete);
+router.put("/trader/status/:id", ctrl.updateStatus);
+router.post("/change-password", ctrl.changePassword);
 
 module.exports = router;
 

@@ -41,7 +41,10 @@ const productSchema = new mongoose.Schema(
         talukVillage: { type: String },
         address: { type: String },
 
-        availableData: { type: String },
+        availableDate: {
+            type: Date,
+            required: true,
+        },
 
         productImage: { type: String },
 

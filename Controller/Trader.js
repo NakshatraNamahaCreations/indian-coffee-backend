@@ -1,3 +1,4 @@
+const { default: mongoose } = require('mongoose');
 const Trader = require('../Modal/Trader');
 const bcrypt = require('bcryptjs');
 
@@ -314,20 +315,39 @@ exports.getAll = async (req, res) => {
     }
 };
 
+// exports.getById = async (req, res) => {
+//     try {
+//         const { id } = req.params;
+//         const trader = await Trader.findById(id);
+//         if (!trader) {
+//             return res.status(404).json({ error: 'Trader not found' });
+//         }
+//         res.json(trader);
+//     } catch (err) {
+//         res.status(500).json({ error: 'Failed to fetch trader' });
+//     }
+// };
+
 exports.getById = async (req, res) => {
     try {
         const { id } = req.params;
-        const trader = await Trader.findById(id).select('-password');
-        if (!trader) {
-            return res.status(404).json({ error: 'Trader not found' });
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ error: "Invalid trader id" });
         }
-        res.json(trader);
+
+        const trader = await Trader.findById(id);
+
+        if (!trader) {
+            return res.status(404).json({ error: "Trader not found" });
+        }
+
+        return res.status(200).json(trader);
     } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch trader' });
+        console.log("getById error:", err);
+        return res.status(500).json({ error: "Failed to fetch trader" });
     }
 };
-
-
 
 exports.delete = async (req, res) => {
     try {
@@ -339,5 +359,94 @@ exports.delete = async (req, res) => {
         res.json({ message: 'Trader deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: 'Failed to delete trader' });
+    }
+};
+
+
+exports.updateStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const farmer = await Trader.findById(id);
+        if (!farmer) {
+            return res.status(404).json({
+                success: false,
+                message: "Farmer not found",
+            });
+        }
+
+        farmer.status = farmer.status === "Active" ? "Inactive" : "Active";
+
+        await farmer.save();
+
+        const responseData = farmer.toObject();
+        delete responseData.password;
+
+        res.json({
+            success: true,
+            message: `Farmer status updated to ${farmer.status}`,
+            data: responseData,
+        });
+    } catch (err) {
+        console.error("Toggle Status Error:", err);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update status",
+        });
+    }
+};
+
+
+
+exports.changePassword = async (req, res) => {
+    try {
+        const { userId, oldPassword, newPassword } = req.body;
+
+        // 1️⃣ Validate input
+        if (!userId || !oldPassword || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: "User ID, old password and new password are required",
+            });
+        }
+
+
+
+        // 2️⃣ Find user
+        const farmer = await Trader.findById(userId);
+        if (!farmer) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        // 3️⃣ Check old password
+        const isMatch = await bcrypt.compare(oldPassword, farmer.password);
+        if (!isMatch) {
+            return res.status(400).json({
+                success: false,
+                message: "Old password is incorrect",
+            });
+        }
+
+        // 4️⃣ Hash new password
+        const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+        // 5️⃣ Update password
+        farmer.password = hashedNewPassword;
+        await farmer.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Password changed successfully",
+        });
+
+    } catch (error) {
+        console.error("Change Password Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to change password",
+        });
     }
 };

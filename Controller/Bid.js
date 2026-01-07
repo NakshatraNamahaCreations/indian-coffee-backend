@@ -160,3 +160,50 @@ exports.getBidsByUser = async (req, res) => {
         res.status(500).json({ error: 'Server error while fetching bids' });
     }
 };
+
+
+exports.getAllBids = async (req, res) => {
+    try {
+        const bids = await Bid.find()
+            .populate("productId", "productTitle pricePerUnit vendorId") // ✅ OK
+            .sort({ createdAt: -1 })
+            .select("-__v");
+
+        res.status(200).json({
+            success: true,
+            count: bids.length,
+            data: bids,
+        });
+    } catch (error) {
+        console.error("Get All Bids Error:", error);
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
+exports.getBidsByVendor = async (req, res) => {
+    try {
+        const { vendorId } = req.params;
+
+        const bids = await Bid.find({
+            "productSnapshot.vendorId": vendorId
+        })
+            .populate("productId", "productTitle pricePerUnit vendorId")
+            .sort({ createdAt: -1 })
+            .select("-__v");
+
+        res.status(200).json({
+            success: true,
+            count: bids.length,
+            data: bids,
+        });
+    } catch (error) {
+        console.error("Get Bids By Vendor Error:", error);
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};

@@ -33,7 +33,7 @@ exports.createProduct = async (req, res) => {
             pincode,
             talukVillage,
             address,
-            availableData,
+            availableDate,
             agreeTermsAndCondition,
             status,
             weightUnit,
@@ -83,7 +83,7 @@ exports.createProduct = async (req, res) => {
             pincode,
             talukVillage,
             address,
-            availableData,
+            availableDate,
             productImage: imagePath,
             agreeTermsAndCondition,
             status: normalizedStatus,
@@ -313,7 +313,6 @@ exports.lockProductAfterPayment = async (req, res) => {
             status: "success"
         });
 
-        // 🔒 Lock product for 20 mins
         product.lockedBy = userId;
         product.lockExpiresAt = new Date(Date.now() + 20 * 60 * 1000);
 
@@ -348,5 +347,64 @@ exports.getProductLockStatus = async (req, res) => {
         res.json({ locked: false });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+};
+
+exports.getProductsByVendor = async (req, res) => {
+    try {
+        const { vendorId } = req.params;
+
+        if (!vendorId) {
+            return res.status(400).json({
+                success: false,
+                message: "Vendor ID is required",
+            });
+        }
+
+        const products = await Product.find({ vendorId })
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            count: products.length,
+            data: products,
+        });
+    } catch (err) {
+        console.error("Get Products By Vendor Error:", err);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch vendor products",
+        });
+    }
+};
+
+
+exports.getProductsByVendordata = async (req, res) => {
+    try {
+        const { vendorId } = req.params;
+
+        if (!vendorId) {
+            return res.status(400).json({
+                success: false,
+                message: "Vendor ID is required",
+            });
+        }
+
+        const products = await Product.find({
+            vendorId: vendorId,
+            status: "Active", // ✅ ONLY ACTIVE PRODUCTS
+        }).sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            count: products.length,
+            data: products,
+        });
+    } catch (err) {
+        console.error("Get Products By Vendor Error:", err);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch vendor products",
+        });
     }
 };

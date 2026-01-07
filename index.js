@@ -5,6 +5,7 @@ const cors = require("cors");
 const morgan = require("morgan");
 require("dotenv").config();
 const cookieParser = require("cookie-parser");
+const path = require("path");
 
 mongoose
     .connect(process.env.MONGO_URI, {
@@ -17,7 +18,8 @@ mongoose
     .catch((err) => console.log("Database Not connected !!!", err));
 
 
-app.use('/uploads', express.static('uploads'));
+// app.use('/uploads', express.static('uploads'));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 
 app.use(express.json({ limit: "10mb" }));
@@ -41,6 +43,8 @@ const BidRoute = require("./Route/Bid");
 const DailymarketcategoryRoute = require("./Route/Dailynarketcategory");
 const favoriteRoute = require("./Route/Favurite");
 const PaymentRoute = require("./Route/Payment");
+const farmerRoute = require("./Route/Farmer");
+const requirementRoute = require("./Route/Addrequirement");
 
 app.use("/api", adminRoute);
 app.use("/api", categoryRoute);
@@ -56,7 +60,8 @@ app.use("/api/bids", BidRoute);
 app.use("/api/dailymarket-category", DailymarketcategoryRoute);
 app.use("/api/favorite", favoriteRoute);
 app.use("/api/payment", PaymentRoute);
-
+app.use("/api/farmer", farmerRoute);
+app.use("/api/requirement", requirementRoute);
 
 const PORT = process.env.PORT || 8000;
 
