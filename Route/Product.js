@@ -40,6 +40,7 @@ router.post("/lock-after-payment", controller.lockProductAfterPayment);
 router.get("/lock/:productId", controller.getProductLockStatus);
 router.get("/products/vendor/:vendorId", controller.getProductsByVendor);
 router.get("/products/vendoractive/:vendorId", controller.getProductsByVendordata);
+router.get("/products/search", controller.searchProducts);
 
 
 module.exports = router;

@@ -45,6 +45,9 @@ const favoriteRoute = require("./Route/Favurite");
 const PaymentRoute = require("./Route/Payment");
 const farmerRoute = require("./Route/Farmer");
 const requirementRoute = require("./Route/Addrequirement");
+const farmerbannerRoute = require("./Route/Farmerbanner");
+
+
 
 app.use("/api", adminRoute);
 app.use("/api", categoryRoute);
@@ -62,8 +65,10 @@ app.use("/api/favorite", favoriteRoute);
 app.use("/api/payment", PaymentRoute);
 app.use("/api/farmer", farmerRoute);
 app.use("/api/requirement", requirementRoute);
+app.use("/api/farmerbanner",farmerbannerRoute);
 
 const PORT = process.env.PORT || 8000;
+require("./corn/unlockProduct");
 
 app.get("/", (req, res) => {
     res.status(200).json({ message: "Welcome to Suman Back end" });

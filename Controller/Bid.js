@@ -1,146 +1,198 @@
-const Bid = require('../Modal/Bid');
+const Bid = require("../Modal/Bid");
 const Product = require('../Modal/Product');
 
-exports.createBid = async (req, res) => {
+// ✅ 1. LOCK BID (₹99) - 20min exclusive
+exports.lockAfterPayment = async (req, res) => {
     try {
-        const { userId, userName, productId, ...bidData } = req.body;
+        const { productId, userId, paymentId, orderId } = req.body;
 
-        const { bidPricePerBag, quantityBags, advanceAmount } = bidData;
-
-        console.log("req.body", req.body)
-        if (!userId || !userName || !productId) {
-            return res.status(400).json({ error: 'Missing userId, userName, or productId' });
+        if (!productId || !userId) {
+            return res.status(400).json({ error: "Missing userId or productId" });
         }
 
-        const product = await Product.findById(productId).lean();
-        if (!product) return res.status(404).json({ error: 'Product not found' });
+        const product = await Product.findById(productId);
+        if (!product) return res.status(404).json({ error: "Product not found" });
 
+        // ✅ Check if already locked
+        if (product.isLocked) {
+            const now = new Date();
+            const expired = product.lockExpiresAt && product.lockExpiresAt < now;
+            
+            if (!expired) {
+                return res.status(400).json({ 
+                    error: `Product locked by ${product.lockedBy} until ${product.lockExpiresAt}` 
+                });
+            }
+            // Auto unlock expired
+            product.isLocked = false;
+            product.lockedBy = null;
+            product.lockExpiresAt = null;
+        }
+
+        // ✅ LOCK FOR 20 MINS
+        product.isLocked = true;
+        product.lockedBy = userId;
+        product.lockExpiresAt = new Date(Date.now() + 20 * 60 * 1000);
+
+        await product.save();
+
+        console.log(`🔒 ${productId} LOCKED by ${userId} until ${product.lockExpiresAt}`);
+
+        res.json({
+            success: true,
+            locked: true,
+            lockedBy: userId,
+            lockExpiresAt: product.lockExpiresAt,
+            message: "✅ Locked for 20 mins exclusive bidding!"
+        });
+    } catch (err) {
+        console.error("Lock error:", err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ✅ 2. PLACE BID (Only if locked by user)
+exports.createBid = async (req, res) => {
+    try {
+        const { userId, userName, productId, bidPricePerBag, quantityBags, advanceAmount, messageToSeller,bidType } = req.body;
+
+        const product = await Product.findById(productId);
+        if (!product) return res.status(404).json({ error: "Product not found" });
+
+        // ✅ MUST BE LOCKED BY THIS USER
+        // if (!product.isLocked || product.lockedBy !== userId) {
+        //     return res.status(403).json({ error: "❌ Must lock product first (₹99)" });
+        // }
+
+        // ✅ ONE BID PER USER
+        const existingBid = await Bid.findOne({
+            userId,
+            productId,
+            status: { $nin: ['rejected', 'inactive'] }
+        });
+        if (existingBid) {
+            return res.status(400).json({ error: "❌ You already have an active bid!" });
+        }
+
+        // ✅ VALIDATE AMOUNTS
         const totalAmount = bidPricePerBag * quantityBags;
         const dueAmount = totalAmount - advanceAmount;
-        if (dueAmount < 0) return res.status(400).json({ error: 'Advance exceeds total' });
+        if (dueAmount < 0) return res.status(400).json({ error: "❌ Invalid amounts" });
 
-        const { _id, __v, createdAt, updatedAt, ...productSnapshot } = product;
-
-        const newBid = new Bid({
+        // ✅ CREATE BID
+        const bid = await Bid.create({
             userId,
             userName,
             productId,
-            productSnapshot,
+            productSnapshot: product.toObject(),
             bidPricePerBag,
             quantityBags,
             advanceAmount,
             totalAmount,
             dueAmount,
-            messageToSeller: bidData.messageToSeller || '',
-            status: 'pending',
+            messageToSeller,
+            bidType,
+            status: "pending"
         });
 
-        await newBid.save();
-        res.status(201).json({ success: true, bid: newBid });
+        console.log(`✅ BID CREATED: ${bid._id} by ${userName}`);
+
+        res.json({ success: true, bid });
+    } catch (err) {
+        console.error("Bid error:", err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ✅ 3. GET LOCK STATUS (Auto-expire)
+exports.getLockStatus = async (req, res) => {
+    try {
+        const productId = req.params.productId;
+        const product = await Product.findById(productId).select("isLocked lockedBy lockExpiresAt");
+
+        if (!product) return res.status(404).json({ error: "Product not found" });
+
+        const now = new Date();
+        
+        // ✅ AUTO-UNLOCK EXPIRED LOCKS
+        if (product.isLocked && product.lockExpiresAt && product.lockExpiresAt < now) {
+            product.isLocked = false;
+            product.lockedBy = null;
+            product.lockExpiresAt = null;
+            await product.save();
+            console.log(`⏰ AUTO-UNLOCKED ${productId}`);
+        }
+
+        res.json({
+            locked: product.isLocked || false,
+            lockedBy: product.lockedBy || null,
+            lockExpiresAt: product.lockExpiresAt || null
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };
 
-
-
-exports.getBidById = async (req, res) => {
-    try {
-        const bid = await Bid.findById(req.params.id);
-        if (!bid) return res.status(404).json({ error: 'Bid not found' });
-        res.json(bid);
-    } catch (err) {
-        res.status(500).json({ error: 'Server error' });
-    }
-};
-
-exports.getBidByUserAndProduct = async (req, res) => {
+exports.getUserBidsForProduct = async (req, res) => {
     try {
         const { userId, productId } = req.params;
-        const bids = await Bid.find({ userId, productId });
+        const bids = await Bid.find({ userId, productId })
+            .sort({ createdAt: -1 })
+            .limit(1);
         res.json(bids);
     } catch (err) {
-        res.status(500).json({ error: 'Server error' });
-    }
-};
-
-exports.updateBid = async (req, res) => {
-    try {
-        const bid = await Bid.findById(req.params.id);
-        if (!bid) return res.status(404).json({ error: 'Bid not found' });
-
-        if (bid.status !== 'pending') {
-            return res.status(403).json({ error: 'Cannot edit bid after submission/approval' });
-        }
-
-        const { bidPricePerBag, quantityBags, advanceAmount, messageToSeller } = req.body;
-
-        let totalAmount = bid.totalAmount;
-        let dueAmount = bid.dueAmount;
-
-        if (bidPricePerBag !== undefined || quantityBags !== undefined) {
-            const price = bidPricePerBag ?? bid.bidPricePerBag;
-            const qty = quantityBags ?? bid.quantityBags;
-            totalAmount = price * qty;
-            dueAmount = totalAmount - (advanceAmount ?? bid.advanceAmount);
-        }
-
-        if (dueAmount < 0) return res.status(400).json({ error: 'Advance exceeds total' });
-
-        if (bidPricePerBag !== undefined) bid.bidPricePerBag = bidPricePerBag;
-        if (quantityBags !== undefined) bid.quantityBags = quantityBags;
-        if (advanceAmount !== undefined) bid.advanceAmount = advanceAmount;
-        if (messageToSeller !== undefined) bid.messageToSeller = messageToSeller;
-
-        bid.totalAmount = totalAmount;
-        bid.dueAmount = dueAmount;
-
-        await bid.save();
-        res.json({ success: true, bid });
-    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };
 
-exports.updateBidStatus = async (req, res) => {
-    try {
-        const { status } = req.body;
-        const validStatuses = ['pending', 'approved', 'rejected', 'active', 'inactive'];
-        if (!validStatuses.includes(status)) {
-            return res.status(400).json({ error: 'Invalid status' });
-        }
-
-        const bid = await Bid.findByIdAndUpdate(
-            req.params.id,
-            { status },
-            { new: true, runValidators: true }
-        );
-
-        if (!bid) return res.status(404).json({ error: 'Bid not found' });
-        res.json({ success: true, bid });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+exports.getAllBids = async (req, res) => {
+    const bids = await Bid.find().sort({ createdAt: -1 });
+    res.json(bids);
 };
 
-// DELETE /api/bids/:id → Soft delete (or hard delete)
-exports.deleteBid = async (req, res) => {
-    try {
-        const bid = await Bid.findById(req.params.id);
-        if (!bid) return res.status(404).json({ error: 'Bid not found' });
-
-        // Optional: Only allow deletion if pending
-        if (bid.status !== 'pending') {
-            return res.status(403).json({ error: 'Cannot delete non-pending bid' });
-        }
-
-        await Bid.findByIdAndDelete(req.params.id);
-        res.json({ success: true, message: 'Bid deleted' });
-    } catch (err) {
-        res.status(500).json({ error: 'Server error' });
-    }
+exports.vendorAcceptBid = async (req, res) => {
+    const bid = await Bid.findByIdAndUpdate(
+        req.params.id,
+        { status: "vendor_accepted" },
+        { new: true }
+    );
+    if (!bid) return res.status(404).json({ error: "Bid not found" });
+    res.json({ success: true, bid });
 };
 
+exports.adminApproveBid = async (req, res) => {
+    const bid = await Bid.findByIdAndUpdate(
+        req.params.id,
+        { status: "admin_approved" },
+        { new: true }
+    );
+    if (!bid) return res.status(404).json({ error: "Bid not found" });
+
+    await Product.findByIdAndUpdate(bid.productId, {
+        isLocked: false,
+        lockedBy: null,
+        lockExpiresAt: null,
+    });
+
+    res.json({ success: true, bid });
+};
+
+exports.adminrejectBid = async (req, res) => {
+    const bid = await Bid.findByIdAndUpdate(
+        req.params.id,
+        { status: "rejected" },
+        { new: true }
+    );
+    if (!bid) return res.status(404).json({ error: "Bid not found" });
+
+    await Product.findByIdAndUpdate(bid.productId, {
+        isLocked: false,
+        lockedBy: null,
+        lockExpiresAt: null,
+    });
+
+    res.json({ success: true, bid });
+};
 
 exports.getBidsByUser = async (req, res) => {
     try {
@@ -161,49 +213,27 @@ exports.getBidsByUser = async (req, res) => {
     }
 };
 
-
-exports.getAllBids = async (req, res) => {
-    try {
-        const bids = await Bid.find()
-            .populate("productId", "productTitle pricePerUnit vendorId") // ✅ OK
-            .sort({ createdAt: -1 })
-            .select("-__v");
-
-        res.status(200).json({
-            success: true,
-            count: bids.length,
-            data: bids,
-        });
-    } catch (error) {
-        console.error("Get All Bids Error:", error);
-        res.status(500).json({
-            success: false,
-            message: error.message,
-        });
-    }
-};
-
 exports.getBidsByVendor = async (req, res) => {
     try {
         const { vendorId } = req.params;
 
+        if (!vendorId) {
+            return res.status(400).json({ error: "Vendor ID is required" });
+        }
+
         const bids = await Bid.find({
             "productSnapshot.vendorId": vendorId
         })
-            .populate("productId", "productTitle pricePerUnit vendorId")
-            .sort({ createdAt: -1 })
-            .select("-__v");
+        .sort({ createdAt: -1 })
+        .select('-__v');
 
         res.status(200).json({
             success: true,
             count: bids.length,
-            data: bids,
+            data:bids
         });
     } catch (error) {
-        console.error("Get Bids By Vendor Error:", error);
-        res.status(500).json({
-            success: false,
-            message: error.message,
-        });
+        console.error("Error fetching vendor bids:", error);
+        res.status(500).json({ error: "Server error while fetching vendor bids" });
     }
 };

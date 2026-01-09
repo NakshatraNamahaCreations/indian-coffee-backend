@@ -408,3 +408,59 @@ exports.getProductsByVendordata = async (req, res) => {
         });
     }
 };
+
+exports.searchProducts = async (req, res) => {
+    try {
+        const {
+            keyword,
+            categoryId,
+            subcategoryId,
+            subsubcategoryId,
+            vendorId,
+            status,
+            minPrice,
+            maxPrice
+        } = req.query;
+
+        let filter = {};
+
+        if (keyword) {
+            filter.productTitle = {
+                $regex: keyword,
+                $options: "i" 
+            };
+        }
+
+        if (categoryId) filter.categoryId = categoryId;
+        if (subcategoryId) filter.subcategoryId = subcategoryId;
+        if (subsubcategoryId) filter.subsubcategoryId = subsubcategoryId;
+
+        if (vendorId) filter.vendorId = vendorId;
+
+        if (status) {
+            filter.status = status.toLowerCase() === "active" ? "Active" : "Inactive";
+        }
+
+        if (minPrice || maxPrice) {
+            filter.pricePerUnit = {};
+            if (minPrice) filter.pricePerUnit.$gte = Number(minPrice);
+            if (maxPrice) filter.pricePerUnit.$lte = Number(maxPrice);
+        }
+
+        const products = await Product.find(filter)
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            count: products.length,
+            data: products
+        });
+
+    } catch (err) {
+        console.error("Search Products Error:", err);
+        res.status(500).json({
+            success: false,
+            message: "Failed to search products"
+        });
+    }
+};

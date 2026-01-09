@@ -2,6 +2,76 @@ const { default: mongoose } = require('mongoose');
 const Trader = require('../Modal/Trader');
 const bcrypt = require('bcryptjs');
 
+// exports.register = async (req, res) => {
+//     try {
+//         const {
+//             userType,
+//             email,
+//             password,
+//             mobileNumber,
+//             state,
+//             district,
+//             townVillage,
+//             pincode,
+//             address,
+//             termsAccepted,
+//             firstName,
+//             lastName,
+//             businessName,
+//             panNumber,
+//             gstNumber,
+//             bidLimit
+//         } = req.body;
+
+
+//         const exist = await Trader.findOne({ email });
+//         if (exist) {
+//             return res.status(400).json({ error: "Email already exists" });
+//         }
+
+//         const hashedPassword = await bcrypt.hash(password, 10);
+//         const files = req.files || {};
+
+//         const trader = new Trader({
+//             userType,
+//             email,
+//             password: hashedPassword,
+//             mobileNumber,
+//             state,
+//             district,
+//             townVillage,
+//             pincode,
+//             address,
+//             termsAccepted,
+//             // bidLimit,
+
+//             firstName,
+//             lastName,
+//             businessName,
+//             panNumber,
+//             gstNumber,
+
+//             aadhaarFront: files.aadhaarFront?.[0]?.path,
+//             aadhaarBack: files.aadhaarBack?.[0]?.path,
+//             panImage: files.panImage?.[0]?.path,
+//             gstImage: files.gstImage?.[0]?.path,
+//             registrationDocs: files.registrationDocs?.map(f => f.path),
+//             bidLimit: Number(bidLimit) || 5,
+//         });
+
+//         await trader.save();
+
+//         return res.status(200).json({
+//             message: "Trader registered",
+//             data: trader
+//         });
+
+//     } catch (err) {
+//         console.log("error", err)
+//         res.status(500).json({ error: err.message });
+//     }
+// };
+
 exports.register = async (req, res) => {
     try {
         const {
@@ -23,10 +93,12 @@ exports.register = async (req, res) => {
             bidLimit
         } = req.body;
 
-
         const exist = await Trader.findOne({ email });
         if (exist) {
-            return res.status(400).json({ error: "Email already exists" });
+            return res.status(400).json({
+                success: false,
+                error: "Email already exists"
+            });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -43,7 +115,6 @@ exports.register = async (req, res) => {
             pincode,
             address,
             termsAccepted,
-            // bidLimit,
 
             firstName,
             lastName,
@@ -51,27 +122,38 @@ exports.register = async (req, res) => {
             panNumber,
             gstNumber,
 
-            aadhaarFront: files.aadhaarFront?.[0]?.path,
-            aadhaarBack: files.aadhaarBack?.[0]?.path,
-            panImage: files.panImage?.[0]?.path,
-            gstImage: files.gstImage?.[0]?.path,
-            registrationDocs: files.registrationDocs?.map(f => f.path),
+            aadhaarFront: files.aadhaarFront?.[0]?.path || null,
+            aadhaarBack: files.aadhaarBack?.[0]?.path || null,
+            panImage: files.panImage?.[0]?.path || null,
+            gstImage: files.gstImage?.[0]?.path || null,
+
             bidLimit: Number(bidLimit) || 5,
         });
 
         await trader.save();
 
-        return res.status(201).json({
-            message: "Trader registered",
-            data: trader
+        return res.status(200).json({
+            success: true,
+            message: "Registration successful",
+            data: {
+                _id: trader._id,
+                userType: trader.userType,
+                email: trader.email,
+                mobileNumber: trader.mobileNumber,
+                state: trader.state,
+                district: trader.district,
+                townVillage: trader.townVillage
+            }
         });
 
     } catch (err) {
-        console.log("error", err)
-        res.status(500).json({ error: err.message });
+        console.error("Register error:", err);
+        return res.status(500).json({
+            success: false,
+            error: "Server error. Please try again."
+        });
     }
 };
-
 
 
 exports.register1 = async (req, res) => {
