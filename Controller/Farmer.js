@@ -1,8 +1,8 @@
 const Farmer = require("../Modal/Farmer");
 const bcrypt = require("bcryptjs");
 const Otp = require("../Modal/Otp");
-const sendOtpSms = require("../utils/sendOtpSms")
-
+const sendOtpSms = require("../utils/sendOtpSms");
+const sendPushNotification = require("../utils/sendPushNotification");
 
 
 exports.register = async (req, res) => {
@@ -324,9 +324,39 @@ exports.delete = async (req, res) => {
     }
 };
 
+// exports.updateStatus = async (req, res) => {
+//     try {
+//         const { id } = req.params;
 
+//         const farmer = await Farmer.findById(id);
 
+//         if (!farmer) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Farmer not found",
+//             });
+//         }
 
+//         farmer.status = farmer.status === "Active" ? "Inactive" : "Active";
+
+//         await farmer.save();
+
+//         const responseData = farmer.toObject();
+//         delete responseData.password;
+
+//         res.json({
+//             success: true,
+//             message: `Farmer status updated to ${farmer.status}`,
+//             data: responseData,
+//         });
+//     } catch (err) {
+//         console.error("Toggle Status Error:", err);
+//         res.status(500).json({
+//             success: false,
+//             message: "Failed to update status",
+//         });
+//     }
+// };
 
 exports.updateStatus = async (req, res) => {
     try {
@@ -340,27 +370,27 @@ exports.updateStatus = async (req, res) => {
             });
         }
 
-        farmer.status = farmer.status === "Active" ? "Inactive" : "Active";
-
+        farmer.status = "Approved";
         await farmer.save();
 
-        const responseData = farmer.toObject();
-        delete responseData.password;
+        await sendPushNotification(
+            farmer.fcmToken,
+            "Profile Approved ✅",
+            "Your farmer profile has been approved by admin. You can now start bidding."
+        );
 
         res.json({
             success: true,
-            message: `Farmer status updated to ${farmer.status}`,
-            data: responseData,
+            message: "Farmer approved and notification sent",
         });
-    } catch (err) {
-        console.error("Toggle Status Error:", err);
+    } catch (error) {
+        console.error(error);
         res.status(500).json({
             success: false,
-            message: "Failed to update status",
+            message: "Failed to approve farmer",
         });
     }
 };
-
 
 exports.changePassword = async (req, res) => {
     try {
@@ -416,6 +446,46 @@ exports.changePassword = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to change password",
+        });
+    }
+};
+
+
+
+
+exports.saveFcmToken = async (req, res) => {
+    try {
+        const { userId, fcmToken } = req.body;
+
+        if (!userId || !fcmToken) {
+            return res.status(400).json({
+                success: false,
+                message: "User ID and FCM token are required",
+            });
+        }
+
+        const farmer = await Farmer.findByIdAndUpdate(
+            userId,
+            { fcmToken },
+            { new: true }
+        );
+
+        if (!farmer) {
+            return res.status(404).json({
+                success: false,
+                message: "Farmer not found",
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "FCM token saved successfully",
+        });
+    } catch (error) {
+        console.error("Save FCM Token Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to save FCM token",
         });
     }
 };
