@@ -1,6 +1,8 @@
 const { default: mongoose } = require('mongoose');
 const Trader = require('../Modal/Trader');
 const bcrypt = require('bcryptjs');
+const Otp = require("../Modal/Otp");
+const sendOtpSms = require("../utils/sendOtpSms");
 
 // exports.register = async (req, res) => {
 //     try {
@@ -346,6 +348,100 @@ exports.edit = async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(400).json({ error: err.message });
+    }
+};
+
+
+
+exports.sendLoginOtp = async (req, res) => {
+    try {
+        const { mobileNumber } = req.body;
+
+        if (!mobileNumber) {
+            return res.status(400).json({
+                success: false,
+                message: "Mobile number is required",
+            });
+        }
+
+        const farmer = await Trader.findOne({ mobileNumber });
+        if (!farmer) {
+            return res.status(404).json({
+                success: false,
+                message: "Mobile number not registered",
+            });
+        }
+
+        const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
+        await Otp.deleteMany({ mobileNumber });
+
+        await Otp.create({
+            mobileNumber,
+            otp,
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        });
+
+        await sendOtpSms(mobileNumber, otp);
+
+        res.status(200).json({
+            success: true,
+            message: "OTP sent for login",
+        });
+
+    } catch (error) {
+        console.error("Login OTP Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to send OTP",
+        });
+    }
+};
+
+exports.verifyOtpAndLogin = async (req, res) => {
+    try {
+        const { mobileNumber, otp } = req.body;
+
+        if (!mobileNumber || !otp) {
+            return res.status(400).json({
+                success: false,
+                message: "Mobile number and OTP are required",
+            });
+        }
+
+        const otpRecord = await Otp.findOne({ mobileNumber, otp });
+
+        if (!otpRecord) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid OTP",
+            });
+        }
+
+        if (otpRecord.expiresAt < new Date()) {
+            await Otp.deleteOne({ _id: otpRecord._id });
+            return res.status(400).json({
+                success: false,
+                message: "OTP expired",
+            });
+        }
+
+        await Otp.deleteOne({ _id: otpRecord._id });
+
+        const farmer = await Trader.findOne({ mobileNumber }).select("-password");
+
+        res.status(200).json({
+            success: true,
+            message: "Login successful",
+            data: farmer,
+        });
+
+    } catch (error) {
+        console.error("Verify OTP Login Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Login failed",
+        });
     }
 };
 

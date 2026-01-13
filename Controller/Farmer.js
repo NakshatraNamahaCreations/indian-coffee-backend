@@ -324,40 +324,6 @@ exports.delete = async (req, res) => {
     }
 };
 
-// exports.updateStatus = async (req, res) => {
-//     try {
-//         const { id } = req.params;
-
-//         const farmer = await Farmer.findById(id);
-
-//         if (!farmer) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: "Farmer not found",
-//             });
-//         }
-
-//         farmer.status = farmer.status === "Active" ? "Inactive" : "Active";
-
-//         await farmer.save();
-
-//         const responseData = farmer.toObject();
-//         delete responseData.password;
-
-//         res.json({
-//             success: true,
-//             message: `Farmer status updated to ${farmer.status}`,
-//             data: responseData,
-//         });
-//     } catch (err) {
-//         console.error("Toggle Status Error:", err);
-//         res.status(500).json({
-//             success: false,
-//             message: "Failed to update status",
-//         });
-//     }
-// };
-
 exports.updateStatus = async (req, res) => {
     try {
         const { id } = req.params;
@@ -370,33 +336,54 @@ exports.updateStatus = async (req, res) => {
             });
         }
 
-        farmer.status = "Approved";
+        farmer.status = farmer.status === "Active" ? "Inactive" : "Active";
         await farmer.save();
 
-        await sendPushNotification(
-            farmer.fcmToken,
-            "Profile Approved ✅",
-            "Your farmer profile has been approved by admin. You can now start bidding."
-        );
+        try {
+            if (farmer.fcmToken) {
+                const title =
+                    farmer.status === "Active"
+                        ? "Account Approved ✅"
+                        : "Account Deactivated ❌";
 
-        res.json({
+                const body =
+                    farmer.status === "Active"
+                        ? "Admin approved your account. You can start using the app."
+                        : "Your account has been deactivated by admin. Please contact support.";
+
+                await sendPushNotification(
+                    farmer.fcmToken,
+                    title,
+                    body
+                );
+            }
+        } catch (pushErr) {
+            console.error("Push notification failed:", pushErr.message);
+        }
+
+        const responseData = farmer.toObject();
+        delete responseData.password;
+        console.log("responseData", responseData)
+
+        return res.json({
             success: true,
-            message: "Farmer approved and notification sent",
+            message: `Farmer status updated to ${farmer.status}`,
+            data: responseData,
         });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({
+    } catch (err) {
+        console.error("Toggle Status Error:", err);
+        return res.status(500).json({
             success: false,
-            message: "Failed to approve farmer",
+            message: "Failed to update status",
         });
     }
 };
+
 
 exports.changePassword = async (req, res) => {
     try {
         const { userId, oldPassword, newPassword } = req.body;
 
-        // 1️⃣ Validate input
         if (!userId || !oldPassword || !newPassword) {
             return res.status(400).json({
                 success: false,
@@ -404,14 +391,7 @@ exports.changePassword = async (req, res) => {
             });
         }
 
-        // if (newPassword.length < 6) {
-        //     return res.status(400).json({
-        //         success: false,
-        //         message: "New password must be at least 6 characters",
-        //     });
-        // }
 
-        // 2️⃣ Find user
         const farmer = await Farmer.findById(userId);
         if (!farmer) {
             return res.status(404).json({
@@ -449,8 +429,6 @@ exports.changePassword = async (req, res) => {
         });
     }
 };
-
-
 
 
 exports.saveFcmToken = async (req, res) => {

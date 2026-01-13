@@ -41,6 +41,9 @@ router.get("/trader/byid/:id", ctrl.getById);
 router.delete("/:id", ctrl.delete);
 router.put("/trader/status/:id", ctrl.updateStatus);
 router.post("/change-password", ctrl.changePassword);
+router.post("/trader/login/send-otp", ctrl.sendLoginOtp);
+router.post("/trader/login/verify-otp", ctrl.verifyOtpAndLogin);
+
 
 module.exports = router;
 
