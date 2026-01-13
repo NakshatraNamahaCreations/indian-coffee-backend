@@ -8,7 +8,7 @@ const otpSchema = new mongoose.Schema(
             index: true,
         },
 
-        otpHash: {
+        otp: {
             type: String,
             required: true,
         },
@@ -16,14 +16,13 @@ const otpSchema = new mongoose.Schema(
         expiresAt: {
             type: Date,
             required: true,
-            default: () => new Date(Date.now() + 30 * 1000), // ⏱ 30 seconds
+            default: () => new Date(Date.now() + 30 * 1000),
             index: true,
         },
     },
     { timestamps: true }
 );
 
-// ⏱ Auto-delete OTP after expiry
 otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.model("Otp", otpSchema);
