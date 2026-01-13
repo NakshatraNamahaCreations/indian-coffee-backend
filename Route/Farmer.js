@@ -41,5 +41,7 @@ router.get("/getfarmer/:id", farmerController.getById);
 router.delete("/deletefarmer/:id", farmerController.delete);
 router.put("/farmer/status/:id", farmerController.updateStatus);
 router.post("/change-password", farmerController.changePassword);
+router.post("/login/send-otp", farmerController.sendLoginOtp);
+router.post("/login/verify-otp", farmerController.verifyOtpAndLogin);
 
 module.exports = router;
