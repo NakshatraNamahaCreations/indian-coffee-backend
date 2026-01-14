@@ -1,7 +1,9 @@
 const Bid = require("../Modal/Bid");
 const Product = require('../Modal/Product');
 const sendPushNotification = require("../utils/sendPushNotification");
+const sendPushNotificationTrader = require("../utilstrader/sendPushNotification")
 const Farmer = require("../Modal/Farmer");
+const Trader = require("../Modal/Trader");
 
 
 
@@ -54,52 +56,6 @@ exports.lockAfterPayment = async (req, res) => {
     }
 };
 
-// exports.createBid = async (req, res) => {
-//     try {
-//         const { userId, userName, productId, bidPricePerBag, quantityBags, advanceAmount, messageToSeller, bidType } = req.body;
-
-//         const product = await Product.findById(productId);
-//         if (!product) return res.status(404).json({ error: "Product not found" });
-
-
-//         const existingBid = await Bid.findOne({
-//             userId,
-//             productId,
-//             status: { $nin: ['rejected', 'inactive'] }
-//         });
-//         if (existingBid) {
-//             return res.status(400).json({ error: "❌ You already have an active bid!" });
-//         }
-
-//         const totalAmount = bidPricePerBag * quantityBags;
-//         const dueAmount = totalAmount - advanceAmount;
-//         if (dueAmount < 0) return res.status(400).json({ error: "❌ Invalid amounts" });
-
-//         const bid = await Bid.create({
-//             userId,
-//             userName,
-//             productId,
-//             productSnapshot: product.toObject(),
-//             bidPricePerBag,
-//             quantityBags,
-//             advanceAmount,
-//             totalAmount,
-//             dueAmount,
-//             messageToSeller,
-//             bidType,
-//             status: "pending"
-//         });
-
-//         console.log(`✅ BID CREATED: ${bid._id} by ${userName}`);
-
-//         res.json({ success: true, bid });
-//     } catch (err) {
-//         console.error("Bid error:", err);
-//         res.status(500).json({ error: err.message });
-//     }
-// };
-
-
 exports.createBid = async (req, res) => {
     try {
         const {
@@ -110,13 +66,12 @@ exports.createBid = async (req, res) => {
             quantityBags,
             advanceAmount,
             messageToSeller,
-            bidType
+            bidType,
         } = req.body;
 
         const product = await Product.findById(productId);
         if (!product) return res.status(404).json({ error: "Product not found" });
 
-        // ❌ Prevent duplicate active bids
         const existingBid = await Bid.findOne({
             userId,
             productId,
@@ -124,15 +79,12 @@ exports.createBid = async (req, res) => {
         });
 
         if (existingBid) {
-            return res.status(400).json({ error: "❌ You already have an active bid!" });
+            return res.status(400).json({ error: "Already bid placed" });
         }
 
         const totalAmount = bidPricePerBag * quantityBags;
         const dueAmount = totalAmount - advanceAmount;
-
-        if (dueAmount < 0) {
-            return res.status(400).json({ error: "❌ Invalid amounts" });
-        }
+        if (dueAmount < 0) return res.status(400).json({ error: "Invalid amount" });
 
         const bid = await Bid.create({
             userId,
@@ -149,35 +101,29 @@ exports.createBid = async (req, res) => {
             status: "pending",
         });
 
-        console.log(`✅ BID CREATED: ${bid._id} by ${userName}`);
-
-
-
         const vendorId = product.vendorId;
 
         if (vendorId) {
             const vendor = await Farmer.findById(vendorId);
 
-            if (vendor?.fcmToken) {
-                const productName = product.productName || "Your product";
+            console.log("vendor", vendor)
 
+
+            if (vendor?.fcmToken) {
                 await sendPushNotification(
-                    vendor.fcmToken,
+                    vendor.fcmToken, // ✅ CORRECT
                     "📢 New Bid Received",
-                    `A new bid has been placed on ${productName}`
+                    `New bid on ${product.productName || "your product"}`
                 );
             }
         }
 
         res.json({ success: true, bid });
-
     } catch (err) {
-        console.error("Bid error:", err);
         res.status(500).json({ error: err.message });
     }
 };
 
-// ✅ 3. GET LOCK STATUS (Auto-expire)
 exports.getLockStatus = async (req, res) => {
     try {
         const productId = req.params.productId;
@@ -223,15 +169,59 @@ exports.getAllBids = async (req, res) => {
     res.json(bids);
 };
 
+// exports.vendorAcceptBid = async (req, res) => {
+//     const bid = await Bid.findByIdAndUpdate(
+//         req.params.id,
+//         { status: "vendor_accepted" },
+//         { new: true }
+//     );
+//     if (!bid) return res.status(404).json({ error: "Bid not found" });
+//     res.json({ success: true, bid });
+// };
+
 exports.vendorAcceptBid = async (req, res) => {
-    const bid = await Bid.findByIdAndUpdate(
-        req.params.id,
-        { status: "vendor_accepted" },
-        { new: true }
-    );
-    if (!bid) return res.status(404).json({ error: "Bid not found" });
-    res.json({ success: true, bid });
+    try {
+        // 1️⃣ Update bid status
+        const bid = await Bid.findByIdAndUpdate(
+            req.params.id,
+            { status: "vendor_accepted" },
+            { new: true }
+        );
+
+        if (!bid) {
+            return res.status(404).json({ error: "Bid not found" });
+        }
+
+        // 2️⃣ Find trader (bid owner)
+        const traderId = bid.userId;
+
+        if (traderId) {
+            const trader = await Trader.findById(traderId);
+
+            // 3️⃣ Send push to trader
+            if (trader?.fcmToken) {
+                await sendPushNotificationTrader(
+                    trader.fcmToken,
+                    "✅ Bid Accepted by Vendor",
+                    "Vendor approved your bid. Waiting for admin approval."
+                );
+
+                console.log("📲 Push sent to trader:", trader._id);
+            } else {
+                console.log("⚠️ Trader has no FCM token");
+            }
+        }
+
+        // 4️⃣ Response
+        res.json({ success: true, bid });
+
+    } catch (error) {
+        console.error("vendorAcceptBid error:", error);
+        res.status(500).json({ error: error.message });
+    }
 };
+
+
 
 exports.adminApproveBid = async (req, res) => {
     const bid = await Bid.findByIdAndUpdate(
