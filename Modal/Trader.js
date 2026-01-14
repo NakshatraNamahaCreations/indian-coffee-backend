@@ -31,7 +31,11 @@ const traderSchema = new mongoose.Schema({
     registrationDocs: [String],
 
     bidLimit: { type: Number, default: 5 },
-    status: { type: String, default: "Inactive" }
+    status: { type: String, default: "Inactive" },
+    fcmToken: {
+        type: String,
+        default: null
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model("Trader", traderSchema);

@@ -43,6 +43,7 @@ router.put("/trader/status/:id", ctrl.updateStatus);
 router.post("/change-password", ctrl.changePassword);
 router.post("/trader/login/send-otp", ctrl.sendLoginOtp);
 router.post("/trader/login/verify-otp", ctrl.verifyOtpAndLogin);
+router.post("/trader/save-fcm-token", ctrl.saveFcmToken);
 
 
 module.exports = router;

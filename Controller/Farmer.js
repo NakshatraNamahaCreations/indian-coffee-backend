@@ -400,7 +400,6 @@ exports.changePassword = async (req, res) => {
             });
         }
 
-        // 3️⃣ Check old password
         const isMatch = await bcrypt.compare(oldPassword, farmer.password);
         if (!isMatch) {
             return res.status(400).json({
@@ -409,10 +408,8 @@ exports.changePassword = async (req, res) => {
             });
         }
 
-        // 4️⃣ Hash new password
         const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
-        // 5️⃣ Update password
         farmer.password = hashedNewPassword;
         await farmer.save();
 

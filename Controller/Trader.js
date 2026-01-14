@@ -4,76 +4,6 @@ const bcrypt = require('bcryptjs');
 const Otp = require("../Modal/Otp");
 const sendOtpSms = require("../utils/sendOtpSms");
 
-// exports.register = async (req, res) => {
-//     try {
-//         const {
-//             userType,
-//             email,
-//             password,
-//             mobileNumber,
-//             state,
-//             district,
-//             townVillage,
-//             pincode,
-//             address,
-//             termsAccepted,
-//             firstName,
-//             lastName,
-//             businessName,
-//             panNumber,
-//             gstNumber,
-//             bidLimit
-//         } = req.body;
-
-
-//         const exist = await Trader.findOne({ email });
-//         if (exist) {
-//             return res.status(400).json({ error: "Email already exists" });
-//         }
-
-//         const hashedPassword = await bcrypt.hash(password, 10);
-//         const files = req.files || {};
-
-//         const trader = new Trader({
-//             userType,
-//             email,
-//             password: hashedPassword,
-//             mobileNumber,
-//             state,
-//             district,
-//             townVillage,
-//             pincode,
-//             address,
-//             termsAccepted,
-//             // bidLimit,
-
-//             firstName,
-//             lastName,
-//             businessName,
-//             panNumber,
-//             gstNumber,
-
-//             aadhaarFront: files.aadhaarFront?.[0]?.path,
-//             aadhaarBack: files.aadhaarBack?.[0]?.path,
-//             panImage: files.panImage?.[0]?.path,
-//             gstImage: files.gstImage?.[0]?.path,
-//             registrationDocs: files.registrationDocs?.map(f => f.path),
-//             bidLimit: Number(bidLimit) || 5,
-//         });
-
-//         await trader.save();
-
-//         return res.status(200).json({
-//             message: "Trader registered",
-//             data: trader
-//         });
-
-//     } catch (err) {
-//         console.log("error", err)
-//         res.status(500).json({ error: err.message });
-//     }
-// };
-
 exports.register = async (req, res) => {
     try {
         const {
@@ -625,6 +555,45 @@ exports.changePassword = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to change password",
+        });
+    }
+};
+
+
+
+exports.saveFcmToken = async (req, res) => {
+    try {
+        const { userId, fcmToken } = req.body;
+
+        if (!userId || !fcmToken) {
+            return res.status(400).json({
+                success: false,
+                message: "User ID and FCM token are required",
+            });
+        }
+
+        const farmer = await Trader.findByIdAndUpdate(
+            userId,
+            { fcmToken },
+            { new: true }
+        );
+
+        if (!farmer) {
+            return res.status(404).json({
+                success: false,
+                message: "Farmer not found",
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "FCM token saved successfully",
+        });
+    } catch (error) {
+        console.error("Save FCM Token Error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to save FCM token",
         });
     }
 };
