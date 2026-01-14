@@ -1,7 +1,10 @@
 const Bid = require("../Modal/Bid");
 const Product = require('../Modal/Product');
+const sendPushNotificationTrader = require("../utilstrader/sendPushNotification");
+const Farmer = require("../Modal/Farmer");
 
-// ✅ 1. LOCK BID (₹99) - 20min exclusive
+
+
 exports.lockAfterPayment = async (req, res) => {
     try {
         const { productId, userId, paymentId, orderId } = req.body;
@@ -17,10 +20,10 @@ exports.lockAfterPayment = async (req, res) => {
         if (product.isLocked) {
             const now = new Date();
             const expired = product.lockExpiresAt && product.lockExpiresAt < now;
-            
+
             if (!expired) {
-                return res.status(400).json({ 
-                    error: `Product locked by ${product.lockedBy} until ${product.lockExpiresAt}` 
+                return res.status(400).json({
+                    error: `Product locked by ${product.lockedBy} until ${product.lockExpiresAt}`
                 });
             }
             // Auto unlock expired
@@ -51,35 +54,86 @@ exports.lockAfterPayment = async (req, res) => {
     }
 };
 
-// ✅ 2. PLACE BID (Only if locked by user)
+// exports.createBid = async (req, res) => {
+//     try {
+//         const { userId, userName, productId, bidPricePerBag, quantityBags, advanceAmount, messageToSeller, bidType } = req.body;
+
+//         const product = await Product.findById(productId);
+//         if (!product) return res.status(404).json({ error: "Product not found" });
+
+
+//         const existingBid = await Bid.findOne({
+//             userId,
+//             productId,
+//             status: { $nin: ['rejected', 'inactive'] }
+//         });
+//         if (existingBid) {
+//             return res.status(400).json({ error: "❌ You already have an active bid!" });
+//         }
+
+//         const totalAmount = bidPricePerBag * quantityBags;
+//         const dueAmount = totalAmount - advanceAmount;
+//         if (dueAmount < 0) return res.status(400).json({ error: "❌ Invalid amounts" });
+
+//         const bid = await Bid.create({
+//             userId,
+//             userName,
+//             productId,
+//             productSnapshot: product.toObject(),
+//             bidPricePerBag,
+//             quantityBags,
+//             advanceAmount,
+//             totalAmount,
+//             dueAmount,
+//             messageToSeller,
+//             bidType,
+//             status: "pending"
+//         });
+
+//         console.log(`✅ BID CREATED: ${bid._id} by ${userName}`);
+
+//         res.json({ success: true, bid });
+//     } catch (err) {
+//         console.error("Bid error:", err);
+//         res.status(500).json({ error: err.message });
+//     }
+// };
+
+
 exports.createBid = async (req, res) => {
     try {
-        const { userId, userName, productId, bidPricePerBag, quantityBags, advanceAmount, messageToSeller,bidType } = req.body;
+        const {
+            userId,
+            userName,
+            productId,
+            bidPricePerBag,
+            quantityBags,
+            advanceAmount,
+            messageToSeller,
+            bidType
+        } = req.body;
 
         const product = await Product.findById(productId);
         if (!product) return res.status(404).json({ error: "Product not found" });
 
-        // ✅ MUST BE LOCKED BY THIS USER
-        // if (!product.isLocked || product.lockedBy !== userId) {
-        //     return res.status(403).json({ error: "❌ Must lock product first (₹99)" });
-        // }
-
-        // ✅ ONE BID PER USER
+        // ❌ Prevent duplicate active bids
         const existingBid = await Bid.findOne({
             userId,
             productId,
-            status: { $nin: ['rejected', 'inactive'] }
+            status: { $nin: ["rejected", "inactive"] },
         });
+
         if (existingBid) {
             return res.status(400).json({ error: "❌ You already have an active bid!" });
         }
 
-        // ✅ VALIDATE AMOUNTS
         const totalAmount = bidPricePerBag * quantityBags;
         const dueAmount = totalAmount - advanceAmount;
-        if (dueAmount < 0) return res.status(400).json({ error: "❌ Invalid amounts" });
 
-        // ✅ CREATE BID
+        if (dueAmount < 0) {
+            return res.status(400).json({ error: "❌ Invalid amounts" });
+        }
+
         const bid = await Bid.create({
             userId,
             userName,
@@ -92,12 +146,33 @@ exports.createBid = async (req, res) => {
             dueAmount,
             messageToSeller,
             bidType,
-            status: "pending"
+            status: "pending",
         });
 
         console.log(`✅ BID CREATED: ${bid._id} by ${userName}`);
 
+        /* --------------------------------------------------
+           🔔 SEND PUSH NOTIFICATION TO PRODUCT VENDOR
+        --------------------------------------------------- */
+
+        const vendorId = product.vendorId;
+
+        if (vendorId) {
+            const vendor = await Farmer.findById(vendorId);
+
+            if (vendor?.fcmToken) {
+                const productName = product.productName || "Your product";
+
+                await sendPushNotificationTrader(
+                    vendor.fcmToken,
+                    "📢 New Bid Received",
+                    `A new bid has been placed on ${productName}`
+                );
+            }
+        }
+
         res.json({ success: true, bid });
+
     } catch (err) {
         console.error("Bid error:", err);
         res.status(500).json({ error: err.message });
@@ -113,7 +188,7 @@ exports.getLockStatus = async (req, res) => {
         if (!product) return res.status(404).json({ error: "Product not found" });
 
         const now = new Date();
-        
+
         // ✅ AUTO-UNLOCK EXPIRED LOCKS
         if (product.isLocked && product.lockExpiresAt && product.lockExpiresAt < now) {
             product.isLocked = false;
@@ -224,13 +299,13 @@ exports.getBidsByVendor = async (req, res) => {
         const bids = await Bid.find({
             "productSnapshot.vendorId": vendorId
         })
-        .sort({ createdAt: -1 })
-        .select('-__v');
+            .sort({ createdAt: -1 })
+            .select('-__v');
 
         res.status(200).json({
             success: true,
             count: bids.length,
-            data:bids
+            data: bids
         });
     } catch (error) {
         console.error("Error fetching vendor bids:", error);
