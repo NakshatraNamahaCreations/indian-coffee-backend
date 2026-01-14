@@ -4,6 +4,7 @@ const sendPushNotification = require("../utils/sendPushNotification");
 const sendPushNotificationTrader = require("../utilstrader/sendPushNotification")
 const Farmer = require("../Modal/Farmer");
 const Trader = require("../Modal/Trader");
+const { default: mongoose } = require("mongoose");
 
 
 
@@ -181,9 +182,17 @@ exports.getAllBids = async (req, res) => {
 
 exports.vendorAcceptBid = async (req, res) => {
     try {
+        // 🔥 FIX: clean the ID
+        const bidId = req.params.id?.trim();
+
+        // 🔒 Validate ObjectId
+        if (!mongoose.Types.ObjectId.isValid(bidId)) {
+            return res.status(400).json({ error: "Invalid Bid ID" });
+        }
+
         // 1️⃣ Update bid status
         const bid = await Bid.findByIdAndUpdate(
-            req.params.id,
+            bidId,
             { status: "vendor_accepted" },
             { new: true }
         );
@@ -192,27 +201,24 @@ exports.vendorAcceptBid = async (req, res) => {
             return res.status(404).json({ error: "Bid not found" });
         }
 
-        // 2️⃣ Find trader (bid owner)
+        // 2️⃣ Find trader
         const traderId = bid.userId;
 
         if (traderId) {
             const trader = await Trader.findById(traderId);
 
-            // 3️⃣ Send push to trader
+            console.log("trader", trader)
+
+            // 3️⃣ Send push
             if (trader?.fcmToken) {
                 await sendPushNotificationTrader(
                     trader.fcmToken,
                     "✅ Bid Accepted by Vendor",
-                    "Vendor approved your bid. Waiting for admin approval."
+                    "Vendor approved your bid. Waiting for admin approval.",
                 );
-
-                console.log("📲 Push sent to trader:", trader._id);
-            } else {
-                console.log("⚠️ Trader has no FCM token");
             }
         }
 
-        // 4️⃣ Response
         res.json({ success: true, bid });
 
     } catch (error) {
@@ -221,23 +227,90 @@ exports.vendorAcceptBid = async (req, res) => {
     }
 };
 
+// exports.adminApproveBid = async (req, res) => {
+//     const bid = await Bid.findByIdAndUpdate(
+//         req.params.id,
+//         { status: "admin_approved" },
+//         { new: true }
+//     );
+//     if (!bid) return res.status(404).json({ error: "Bid not found" });
+
+//     await Product.findByIdAndUpdate(bid.productId, {
+//         isLocked: false,
+//         lockedBy: null,
+//         lockExpiresAt: null,
+//     });
+
+//     res.json({ success: true, bid });
+// };
 
 
 exports.adminApproveBid = async (req, res) => {
-    const bid = await Bid.findByIdAndUpdate(
-        req.params.id,
-        { status: "admin_approved" },
-        { new: true }
-    );
-    if (!bid) return res.status(404).json({ error: "Bid not found" });
+    try {
+        const bidId = req.params.id?.trim();
 
-    await Product.findByIdAndUpdate(bid.productId, {
-        isLocked: false,
-        lockedBy: null,
-        lockExpiresAt: null,
-    });
+        if (!mongoose.Types.ObjectId.isValid(bidId)) {
+            return res.status(400).json({ error: "Invalid Bid ID" });
+        }
 
-    res.json({ success: true, bid });
+        // 1️⃣ Update bid status
+        const bid = await Bid.findByIdAndUpdate(
+            bidId,
+            { status: "admin_approved" },
+            { new: true }
+        );
+
+        if (!bid) {
+            return res.status(404).json({ error: "Bid not found" });
+        }
+
+        // 2️⃣ Unlock product
+        const product = await Product.findByIdAndUpdate(
+            bid.productId,
+            {
+                isLocked: false,
+                lockedBy: null,
+                lockExpiresAt: null,
+            },
+            { new: true }
+        );
+
+        /* ------------------------------------------------
+           🔔 SEND PUSH TO TRADER
+        ------------------------------------------------ */
+        if (bid.userId) {
+            const trader = await Trader.findById(bid.userId);
+
+            if (trader?.fcmToken) {
+                await sendPushNotificationTrader(
+                    trader.fcmToken,
+                    "🎉 Bid Approved by Admin",
+                    "Your bid has been approved by admin. Please proceed with next steps."
+                );
+            }
+        }
+
+        /* ------------------------------------------------
+           🔔 SEND PUSH TO FARMER (VENDOR)
+        ------------------------------------------------ */
+        if (product?.vendorId) {
+            const farmer = await Farmer.findById(product.vendorId);
+
+            if (farmer?.fcmToken) {
+                await sendPushNotification(
+                    farmer.fcmToken,
+                    "✅ Bid Approved by Admin",
+                    "Admin approved the bid. You can proceed with the order."
+                );
+            }
+        }
+
+        res.json({ success: true, bid });
+
+    } catch (error) {
+        console.error("adminApproveBid error:", error);
+        res.status(500).json({ error: error.message });
+    }
 };
 
 exports.adminrejectBid = async (req, res) => {
