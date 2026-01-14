@@ -1,6 +1,6 @@
 const Bid = require("../Modal/Bid");
 const Product = require('../Modal/Product');
-const sendPushNotificationTrader = require("../utilstrader/sendPushNotification");
+const sendPushNotification = require("../utils/sendPushNotification");
 const Farmer = require("../Modal/Farmer");
 
 
@@ -151,9 +151,7 @@ exports.createBid = async (req, res) => {
 
         console.log(`✅ BID CREATED: ${bid._id} by ${userName}`);
 
-        /* --------------------------------------------------
-           🔔 SEND PUSH NOTIFICATION TO PRODUCT VENDOR
-        --------------------------------------------------- */
+
 
         const vendorId = product.vendorId;
 
@@ -163,7 +161,7 @@ exports.createBid = async (req, res) => {
             if (vendor?.fcmToken) {
                 const productName = product.productName || "Your product";
 
-                await sendPushNotificationTrader(
+                await sendPushNotification(
                     vendor.fcmToken,
                     "📢 New Bid Received",
                     `A new bid has been placed on ${productName}`
