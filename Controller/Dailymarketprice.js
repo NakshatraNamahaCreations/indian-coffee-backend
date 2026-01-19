@@ -160,7 +160,7 @@ exports.getAllDailyMarketPricesAdmin = async (req, res) => {
 //     }
 // };
 
-exports.getLatestPricesWithChangeAdmin = async (req, res) => {
+exports.getLatestAvailableHighestPriceAdmin = async (req, res) => {
     try {
         const now = new Date();
 
