@@ -409,6 +409,63 @@ exports.getProductsByVendordata = async (req, res) => {
     }
 };
 
+// exports.searchProducts = async (req, res) => {
+//     try {
+//         const {
+//             keyword,
+//             categoryId,
+//             subcategoryId,
+//             subsubcategoryId,
+//             vendorId,
+//             status,
+//             minPrice,
+//             maxPrice
+//         } = req.query;
+
+//         let filter = {};
+
+//         if (keyword) {
+//             filter.productTitle = {
+//                 $regex: keyword,
+//                 $options: "i" 
+//             };
+//         }
+
+//         if (categoryId) filter.categoryId = categoryId;
+//         if (subcategoryId) filter.subcategoryId = subcategoryId;
+//         if (subsubcategoryId) filter.subsubcategoryId = subsubcategoryId;
+
+//         if (vendorId) filter.vendorId = vendorId;
+
+//         if (status) {
+//             filter.status = status.toLowerCase() === "active" ? "Active" : "Inactive";
+//         }
+
+//         if (minPrice || maxPrice) {
+//             filter.pricePerUnit = {};
+//             if (minPrice) filter.pricePerUnit.$gte = Number(minPrice);
+//             if (maxPrice) filter.pricePerUnit.$lte = Number(maxPrice);
+//         }
+
+//         const products = await Product.find(filter)
+//             .sort({ createdAt: -1 });
+
+//         res.status(200).json({
+//             success: true,
+//             count: products.length,
+//             data: products
+//         });
+
+//     } catch (err) {
+//         console.error("Search Products Error:", err);
+//         res.status(500).json({
+//             success: false,
+//             message: "Failed to search products"
+//         });
+//     }
+// };
+
+
 exports.searchProducts = async (req, res) => {
     try {
         const {
@@ -419,48 +476,66 @@ exports.searchProducts = async (req, res) => {
             vendorId,
             status,
             minPrice,
-            maxPrice
+            maxPrice,
+            state,
+            cityDistrict,
+            pincode,
+            talukVillage,
         } = req.query;
 
-        let filter = {};
+        const filter = {};
 
-        if (keyword) {
-            filter.productTitle = {
-                $regex: keyword,
-                $options: "i" 
-            };
+        // ✅ Keyword search (productTitle)
+        if (keyword && keyword.trim()) {
+            filter.productTitle = { $regex: keyword.trim(), $options: "i" };
         }
 
+        // ✅ Category filters
         if (categoryId) filter.categoryId = categoryId;
         if (subcategoryId) filter.subcategoryId = subcategoryId;
         if (subsubcategoryId) filter.subsubcategoryId = subsubcategoryId;
 
+        // ✅ Vendor
         if (vendorId) filter.vendorId = vendorId;
 
+        // ✅ Status
         if (status) {
-            filter.status = status.toLowerCase() === "active" ? "Active" : "Inactive";
+            const s = String(status).toLowerCase();
+            if (s === "active") filter.status = "Active";
+            else if (s === "inactive") filter.status = "Inactive";
+            // else ignore invalid value
         }
 
+        // ✅ Price range
         if (minPrice || maxPrice) {
             filter.pricePerUnit = {};
-            if (minPrice) filter.pricePerUnit.$gte = Number(minPrice);
-            if (maxPrice) filter.pricePerUnit.$lte = Number(maxPrice);
+            if (minPrice !== undefined) filter.pricePerUnit.$gte = Number(minPrice);
+            if (maxPrice !== undefined) filter.pricePerUnit.$lte = Number(maxPrice);
         }
 
-        const products = await Product.find(filter)
-            .sort({ createdAt: -1 });
+        // ✅ Location filters
+        // NOTE: If these fields are nested like product.location.state,
+        // change to: filter["location.state"] = ...
+        if (state) filter.state = { $regex: String(state).trim(), $options: "i" };
+        if (cityDistrict)
+            filter.cityDistrict = { $regex: String(cityDistrict).trim(), $options: "i" };
+        if (talukVillage)
+            filter.talukVillage = { $regex: String(talukVillage).trim(), $options: "i" };
+        if (pincode) filter.pincode = String(pincode).trim();
 
-        res.status(200).json({
+        const products = await Product.find(filter).sort({ createdAt: -1 });
+
+        return res.status(200).json({
             success: true,
             count: products.length,
-            data: products
+            data: products,
         });
-
     } catch (err) {
         console.error("Search Products Error:", err);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            message: "Failed to search products"
+            message: "Failed to search products",
+            error: err.message,
         });
     }
 };
