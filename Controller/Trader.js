@@ -4,6 +4,9 @@ const bcrypt = require('bcryptjs');
 const Otp = require("../Modal/Otp");
 const sendOtpSms = require("../utils/sendOtpSms");
 
+const normalizeMobile = (m = "") =>
+    String(m).replace(/\D/g, "").replace(/^91/, "").trim();
+
 exports.register = async (req, res) => {
     try {
         const {
@@ -328,52 +331,109 @@ exports.sendLoginOtp = async (req, res) => {
     }
 };
 
+// exports.verifyOtpAndLogin = async (req, res) => {
+//     try {
+//         const { mobileNumber, otp } = req.body;
+
+//         if (!mobileNumber || !otp) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Mobile number and OTP are required",
+//             });
+//         }
+
+//         const otpRecord = await Otp.findOne({ mobileNumber, otp });
+
+//         if (!otpRecord) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Invalid OTP",
+//             });
+//         }
+
+//         if (otpRecord.expiresAt < new Date()) {
+//             await Otp.deleteOne({ _id: otpRecord._id });
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "OTP expired",
+//             });
+//         }
+
+//         await Otp.deleteOne({ _id: otpRecord._id });
+
+//         const farmer = await Trader.findOne({ mobileNumber }).select("-password");
+
+//         res.status(200).json({
+//             success: true,
+//             message: "Login successful",
+//             data: farmer,
+//         });
+
+//     } catch (error) {
+//         console.error("Verify OTP Login Error:", error);
+//         res.status(500).json({
+//             success: false,
+//             message: "Login failed",
+//         });
+//     }
+// };
+
 exports.verifyOtpAndLogin = async (req, res) => {
     try {
-        const { mobileNumber, otp } = req.body;
+        const mobileNumber = normalizeMobile(req.body.mobileNumber);
+        const otpInput = String(req.body.otp || "").trim();
 
-        if (!mobileNumber || !otp) {
+        if (!mobileNumber || !otpInput) {
             return res.status(400).json({
                 success: false,
                 message: "Mobile number and OTP are required",
             });
         }
 
-        const otpRecord = await Otp.findOne({ mobileNumber, otp });
+        // ✅ fetch latest OTP for this number
+        const otpRecord = await Otp.findOne({ mobileNumber }).sort({ createdAt: -1 });
 
         if (!otpRecord) {
             return res.status(400).json({
                 success: false,
-                message: "Invalid OTP",
+                message: "OTP not found. Please request a new OTP.",
             });
         }
 
         if (otpRecord.expiresAt < new Date()) {
-            await Otp.deleteOne({ _id: otpRecord._id });
+            await Otp.deleteMany({ mobileNumber });
             return res.status(400).json({
                 success: false,
                 message: "OTP expired",
             });
         }
 
-        await Otp.deleteOne({ _id: otpRecord._id });
+        if (String(otpRecord.otp).trim() !== otpInput) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid OTP",
+            });
+        }
 
-        const farmer = await Trader.findOne({ mobileNumber }).select("-password");
+        // ✅ success: delete all OTPs for that number
+        await Otp.deleteMany({ mobileNumber });
 
-        res.status(200).json({
+        const trader = await Trader.findOne({ mobileNumber }).select("-password");
+
+        return res.status(200).json({
             success: true,
             message: "Login successful",
-            data: farmer,
+            data: trader,
         });
-
     } catch (error) {
         console.error("Verify OTP Login Error:", error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Login failed",
         });
     }
 };
+
 
 exports.login = async (req, res) => {
     try {
