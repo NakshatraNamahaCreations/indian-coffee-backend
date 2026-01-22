@@ -1,11 +1,220 @@
 const { default: mongoose } = require('mongoose');
-const Trader = require('../Modal/Trader');
+// const Trader = require('../Modal/Trader');
 const bcrypt = require('bcryptjs');
+// const Otp = require("../Modal/Otp");
+// const sendOtpSms = require("../utils/sendOtpSms");
+const Trader = require("../Modal/Trader");
 const Otp = require("../Modal/Otp");
 const sendOtpSms = require("../utils/sendOtpSms");
 
-const normalizeMobile = (m = "") =>
-    String(m).replace(/\D/g, "").replace(/^91/, "").trim();
+// const normalizeMobile = (m = "") =>
+//     String(m).replace(/\D/g, "").replace(/^91/, "").trim();
+
+
+// exports.sendLoginOtp = async (req, res) => {
+//     try {
+//         const { mobileNumber } = req.body;
+
+//         if (!mobileNumber) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Mobile number is required",
+//             });
+//         }
+
+//         const farmer = await Trader.findOne({ mobileNumber });
+//         if (!farmer) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Mobile number not registered",
+//             });
+//         }
+
+//         const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
+//         await Otp.deleteMany({ mobileNumber });
+
+//         await Otp.create({
+//             mobileNumber,
+//             otp,
+//             expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+//         });
+
+//         await sendOtpSms(mobileNumber, otp);
+
+//         res.status(200).json({
+//             success: true,
+//             message: "OTP sent for login",
+//         });
+
+//     } catch (error) {
+//         console.error("Login OTP Error:", error);
+//         res.status(500).json({
+//             success: false,
+//             message: "Failed to send OTP",
+//         });
+//     }
+// };
+
+// exports.verifyOtpAndLogin = async (req, res) => {
+//     try {
+//         const { mobileNumber, otp } = req.body;
+
+//         if (!mobileNumber || !otp) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Mobile number and OTP are required",
+//             });
+//         }
+
+//         const otpRecord = await Otp.findOne({ mobileNumber, otp });
+
+//         if (!otpRecord) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Invalid OTP",
+//             });
+//         }
+
+//         if (otpRecord.expiresAt < new Date()) {
+//             await Otp.deleteOne({ _id: otpRecord._id });
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "OTP expired",
+//             });
+//         }
+
+//         await Otp.deleteOne({ _id: otpRecord._id });
+
+//         const farmer = await Trader.findOne({ mobileNumber }).select("-password");
+
+//         res.status(200).json({
+//             success: true,
+//             message: "Login successful",
+//             data: farmer,
+//         });
+
+//     } catch (error) {
+//         console.error("Verify OTP Login Error:", error);
+//         res.status(500).json({
+//             success: false,
+//             message: "Login failed",
+//         });
+//     }
+// };
+
+
+
+
+const isValidIndian10Digit = (m = "") => /^[6-9]\d{9}$/.test(String(m).trim());
+
+exports.sendLoginOtp = async (req, res) => {
+    try {
+        const mobileNumber = String(req.body?.mobileNumber || "").trim();
+
+        // ✅ STRICT: Reject if not exactly 10-digit (no +91 / 91)
+        if (!isValidIndian10Digit(mobileNumber)) {
+            return res.status(400).json({
+                success: false,
+                message: "Enter valid 10-digit mobile number (without country code).",
+            });
+        }
+
+        const farmer = await Trader.findOne({ mobileNumber });
+        if (!farmer) {
+            return res.status(404).json({
+                success: false,
+                message: "Mobile number not registered",
+            });
+        }
+
+        const otp = String(Math.floor(1000 + Math.random() * 9000));
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+        // keep only latest OTP
+        await Otp.deleteMany({ mobileNumber });
+
+        await Otp.create({ mobileNumber, otp, expiresAt });
+
+        // send OTP to same 10-digit number (provider should accept)
+        await sendOtpSms(mobileNumber, otp);
+
+        return res.status(200).json({
+            success: true,
+            message: "OTP sent for login",
+        });
+    } catch (error) {
+        console.error("sendLoginOtp Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to send OTP",
+        });
+    }
+};
+
+exports.verifyOtpAndLogin = async (req, res) => {
+    try {
+        const mobileNumber = String(req.body?.mobileNumber || "").trim();
+        const otp = String(req.body?.otp || "").trim();
+
+        // ✅ STRICT: 10-digit only, OTP required
+        if (!isValidIndian10Digit(mobileNumber) || !/^\d{4}$/.test(otp)) {
+            return res.status(400).json({
+                success: false,
+                message: "Valid 10-digit mobile and 4-digit OTP are required.",
+            });
+        }
+
+        // latest OTP for this number
+        const otpRecord = await Otp.findOne({ mobileNumber }).sort({ createdAt: -1 });
+
+        if (!otpRecord) {
+            return res.status(400).json({
+                success: false,
+                message: "OTP not found. Please request OTP again.",
+            });
+        }
+
+        if (otpRecord.expiresAt < new Date()) {
+            await Otp.deleteMany({ mobileNumber });
+            return res.status(400).json({
+                success: false,
+                message: "OTP expired. Please request again.",
+            });
+        }
+
+        if (String(otpRecord.otp) !== otp) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid OTP",
+            });
+        }
+
+        // OTP used -> delete
+        await Otp.deleteMany({ mobileNumber });
+
+        const farmer = await Trader.findOne({ mobileNumber }).select("-password");
+
+        if (!farmer) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Login successful",
+            data: farmer,
+        });
+    } catch (error) {
+        console.error("verifyOtpAndLogin Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Login failed",
+        });
+    }
+};
 
 exports.register = async (req, res) => {
     try {
@@ -286,153 +495,8 @@ exports.edit = async (req, res) => {
 
 
 
-exports.sendLoginOtp = async (req, res) => {
-    try {
-        const { mobileNumber } = req.body;
 
-        if (!mobileNumber) {
-            return res.status(400).json({
-                success: false,
-                message: "Mobile number is required",
-            });
-        }
 
-        const farmer = await Trader.findOne({ mobileNumber });
-        if (!farmer) {
-            return res.status(404).json({
-                success: false,
-                message: "Mobile number not registered",
-            });
-        }
-
-        const otp = Math.floor(1000 + Math.random() * 9000).toString();
-
-        await Otp.deleteMany({ mobileNumber });
-
-        await Otp.create({
-            mobileNumber,
-            otp,
-            expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-        });
-
-        await sendOtpSms(mobileNumber, otp);
-
-        res.status(200).json({
-            success: true,
-            message: "OTP sent for login",
-        });
-
-    } catch (error) {
-        console.error("Login OTP Error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to send OTP",
-        });
-    }
-};
-
-// exports.verifyOtpAndLogin = async (req, res) => {
-//     try {
-//         const { mobileNumber, otp } = req.body;
-
-//         if (!mobileNumber || !otp) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "Mobile number and OTP are required",
-//             });
-//         }
-
-//         const otpRecord = await Otp.findOne({ mobileNumber, otp });
-
-//         if (!otpRecord) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "Invalid OTP",
-//             });
-//         }
-
-//         if (otpRecord.expiresAt < new Date()) {
-//             await Otp.deleteOne({ _id: otpRecord._id });
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "OTP expired",
-//             });
-//         }
-
-//         await Otp.deleteOne({ _id: otpRecord._id });
-
-//         const farmer = await Trader.findOne({ mobileNumber }).select("-password");
-
-//         res.status(200).json({
-//             success: true,
-//             message: "Login successful",
-//             data: farmer,
-//         });
-
-//     } catch (error) {
-//         console.error("Verify OTP Login Error:", error);
-//         res.status(500).json({
-//             success: false,
-//             message: "Login failed",
-//         });
-//     }
-// };
-
-exports.verifyOtpAndLogin = async (req, res) => {
-    try {
-        const mobileNumber = normalizeMobile(req.body.mobileNumber);
-        const otpInput = String(req.body.otp || "").trim();
-
-        if (!mobileNumber || !otpInput) {
-            return res.status(400).json({
-                success: false,
-                message: "Mobile number and OTP are required",
-            });
-        }
-
-        // ✅ fetch latest OTP for this number
-        const otpRecord = await Otp.findOne({ mobileNumber }).sort({ createdAt: -1 });
-
-        if (!otpRecord) {
-            return res.status(400).json({
-                success: false,
-                message: "OTP not found. Please request a new OTP.",
-            });
-        }
-
-        if (otpRecord.expiresAt < new Date()) {
-            await Otp.deleteMany({ mobileNumber });
-            return res.status(400).json({
-                success: false,
-                message: "OTP expired",
-            });
-        }
-
-        if (String(otpRecord.otp).trim() !== otpInput) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid OTP",
-            });
-        }
-
-        // ✅ success: delete all OTPs for that number
-        await Otp.deleteMany({ mobileNumber });
-
-        const trader = await Trader.findOne({ mobileNumber }).select("-password");
-
-        return res.status(200).json({
-            success: true,
-            message: "Login successful",
-            data: trader,
-        });
-    } catch (error) {
-        console.error("Verify OTP Login Error:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Login failed",
-        });
-    }
-};
 
 
 exports.login = async (req, res) => {
