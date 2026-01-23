@@ -1,4 +1,5 @@
 // Controller/Addrequirement.js
+const { default: mongoose } = require("mongoose");
 const Requirement = require("../Modal/Addrequirement");
 const Category = require("../Modal/Category");
 const Subcategory = require("../Modal/Subcategory");
