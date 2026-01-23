@@ -83,6 +83,7 @@ router.patch(
   RequirementController.finalAdminApproveProduct
 );
 router.get("/listby/:userId", RequirementController.listByUser);
-router.put("/:id/approval", RequirementController.updateApproval)
+router.put("/:id/approval", RequirementController.updateApproval);
+router.post("/requirement/:requirementId/offer", RequirementController.placeOrUpdateOffer);
 
 module.exports = router;

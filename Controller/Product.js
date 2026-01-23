@@ -4,7 +4,9 @@ const Subcategory = require("../Modal/Subcategory");
 const Subsubcategory = require("../Modal/Subsubcategory");
 const WeightUnit = require("../Modal/Weightunit");
 const Payment = require("../Modal/Payment");
-
+const sendPushNotification = require("../utils/sendPushNotification");
+const Farmer = require("../Modal/Farmer");
+const { default: mongoose } = require("mongoose");
 
 exports.createProduct = async (req, res) => {
     try {
@@ -38,12 +40,10 @@ exports.createProduct = async (req, res) => {
             status,
             weightUnit,
             vendorName,
-            vendorId
+            vendorId,
         } = req.body;
 
-        console.log("req.body", req.body)
-
-        const normalizedStatus = status?.toLowerCase() === 'active' ? 'Active' : 'Inactive';
+        const normalizedStatus = status?.toLowerCase() === "active" ? "Active" : "Inactive";
 
         let imagePath = "";
         if (req.file) {
@@ -52,9 +52,14 @@ exports.createProduct = async (req, res) => {
 
         const category = categoryId ? await Category.findById(categoryId) : null;
         const subcategory = subcategoryId ? await Subcategory.findById(subcategoryId) : null;
-        const subsubcategory = (subsubcategoryId && subsubcategoryId.trim() !== "")
-            ? await Subsubcategory.findById(subsubcategoryId)
-            : null;
+        const subsubcategory =
+            subsubcategoryId && String(subsubcategoryId).trim() !== ""
+                ? await Subsubcategory.findById(subsubcategoryId)
+                : null;
+
+        // ✅ convert quantity safely
+        const qtyNum = Number(quantity);
+        const safeQty = Number.isFinite(qtyNum) && qtyNum > 0 ? qtyNum : 0;
 
         const productData = {
             productTitle,
@@ -62,9 +67,18 @@ exports.createProduct = async (req, res) => {
             categoryName: category?.Categoryname,
             subcategoryId,
             subcategoryName: subcategory?.subcategoryName,
+
+            subsubcategoryId: undefined,
+            subsubcategoryName: undefined,
+
             weightUnitId,
             weightUnitName: weightUnit?.weightUnitName,
-            quantity,
+
+            quantity: safeQty,
+
+            // ✅ first time set availableQuantity = quantity
+            availableQuantity: safeQty,
+
             pricePerUnit,
             advancePayment,
             postHarvestProcess,
@@ -88,22 +102,209 @@ exports.createProduct = async (req, res) => {
             agreeTermsAndCondition,
             status: normalizedStatus,
             vendorName,
-            vendorId
+            vendorId,
         };
 
-        if (subsubcategoryId && subsubcategoryId.trim() !== "") {
+        if (subsubcategoryId && String(subsubcategoryId).trim() !== "") {
             productData.subsubcategoryId = subsubcategoryId;
             productData.subsubcategoryName = subsubcategory?.subsubcategoryName;
+        } else {
+            delete productData.subsubcategoryId;
+            delete productData.subsubcategoryName;
         }
 
         const product = new Product(productData);
         await product.save();
 
-        res.status(201).json({ success: true, data: product });
-
+        return res.status(201).json({ success: true, data: product });
     } catch (err) {
         console.error("Create Product Error:", err);
-        res.status(500).json({ success: false, message: err.message });
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+
+// exports.createProduct = async (req, res) => {
+//     try {
+//         const {
+//             productTitle,
+//             categoryId,
+//             subcategoryId,
+//             subsubcategoryId,
+//             weightUnitId,
+//             quantity,
+//             pricePerUnit,
+//             advancePayment,
+//             postHarvestProcess,
+//             beanSize,
+//             beanShape,
+//             cropYear,
+//             scaScore,
+//             moisture,
+//             maxDefects,
+//             minDefects,
+//             packagingForShipment,
+//             minimumQuantity,
+//             country,
+//             state,
+//             cityDistrict,
+//             pincode,
+//             talukVillage,
+//             address,
+//             availableDate,
+//             agreeTermsAndCondition,
+//             status,
+//             weightUnit,
+//             vendorName,
+//             vendorId
+//         } = req.body;
+
+//         console.log("req.body", req.body)
+
+//         const normalizedStatus = status?.toLowerCase() === 'active' ? 'Active' : 'Inactive';
+
+//         let imagePath = "";
+//         if (req.file) {
+//             imagePath = req.file.path.replace(/\\/g, "/");
+//         }
+
+//         const category = categoryId ? await Category.findById(categoryId) : null;
+//         const subcategory = subcategoryId ? await Subcategory.findById(subcategoryId) : null;
+//         const subsubcategory = (subsubcategoryId && subsubcategoryId.trim() !== "")
+//             ? await Subsubcategory.findById(subsubcategoryId)
+//             : null;
+
+//         const productData = {
+//             productTitle,
+//             categoryId,
+//             categoryName: category?.Categoryname,
+//             subcategoryId,
+//             subcategoryName: subcategory?.subcategoryName,
+//             weightUnitId,
+//             weightUnitName: weightUnit?.weightUnitName,
+//             quantity,
+//             pricePerUnit,
+//             advancePayment,
+//             postHarvestProcess,
+//             beanSize,
+//             beanShape,
+//             cropYear,
+//             scaScore,
+//             moisture,
+//             maxDefects,
+//             minDefects,
+//             packagingForShipment,
+//             minimumQuantity,
+//             country,
+//             state,
+//             cityDistrict,
+//             pincode,
+//             talukVillage,
+//             address,
+//             availableDate,
+//             productImage: imagePath,
+//             agreeTermsAndCondition,
+//             status: normalizedStatus,
+//             vendorName,
+//             vendorId
+//         };
+
+//         if (subsubcategoryId && subsubcategoryId.trim() !== "") {
+//             productData.subsubcategoryId = subsubcategoryId;
+//             productData.subsubcategoryName = subsubcategory?.subsubcategoryName;
+//         }
+
+//         const product = new Product(productData);
+//         await product.save();
+
+//         res.status(201).json({ success: true, data: product });
+
+//     } catch (err) {
+//         console.error("Create Product Error:", err);
+//         res.status(500).json({ success: false, message: err.message });
+//     }
+// };
+
+
+// exports.updateProductStatus = async (req, res) => {
+//     try {
+//         const { status } = req.body;
+
+//         const normalizedStatus = status?.toLowerCase() === "active" ? "Active" : "Inactive";
+
+//         const updatedProduct = await Product.findByIdAndUpdate(
+//             req.params.id,
+//             { status: normalizedStatus },
+//             { new: true }
+//         );
+
+//         if (!updatedProduct) {
+//             return res.status(404).json({ success: false, message: "Product not found" });
+//         }
+
+//         res.status(200).json({
+//             success: true,
+//             message: "Status updated successfully",
+//             data: updatedProduct
+//         });
+//     } catch (err) {
+//         res.status(500).json({ success: false, message: err.message });
+//     }
+// };
+
+exports.updateProductStatus = async (req, res) => {
+    try {
+        const { status } = req.body;
+
+        const normalizedStatus =
+            String(status || "").toLowerCase() === "active" ? "Active" : "Inactive";
+
+        // ✅ update product
+        const updatedProduct = await Product.findByIdAndUpdate(
+            req.params.id,
+            { status: normalizedStatus },
+            { new: true }
+        );
+
+        if (!updatedProduct) {
+            return res.status(404).json({ success: false, message: "Product not found" });
+        }
+
+        console.log("updatedProduct", updatedProduct);
+
+        // ✅ convert vendorId string -> ObjectId safely
+        let vendorObjectId = null;
+        if (updatedProduct.vendorId && mongoose.Types.ObjectId.isValid(updatedProduct.vendorId)) {
+            vendorObjectId = new mongoose.Types.ObjectId(updatedProduct.vendorId);
+        }
+
+        // ✅ find vendor/farmer
+        const vendor = vendorObjectId ? await Farmer.findById(vendorObjectId) : null;
+
+        // ✅ get token (change field name if yours differs)
+        const fcmToken = vendor?.fcmToken;
+
+        // ✅ send push
+        const title = "Product Status Updated";
+        const body =
+            normalizedStatus === "Active"
+                ? `✅ Your product "${updatedProduct.productTitle}" is now Active.`
+                : `⏸️ Your product "${updatedProduct.productTitle}" is now Inactive.`;
+
+        if (fcmToken) {
+            await sendPushNotification(fcmToken, title, body);
+        } else {
+            console.log("No fcmToken for vendor:", updatedProduct.vendorId);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Status updated successfully",
+            data: updatedProduct,
+        });
+    } catch (err) {
+        console.log("updateProductStatus error:", err);
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -179,31 +380,7 @@ exports.getProductById = async (req, res) => {
 
 
 
-exports.updateProductStatus = async (req, res) => {
-    try {
-        const { status } = req.body;
 
-        const normalizedStatus = status?.toLowerCase() === "active" ? "Active" : "Inactive";
-
-        const updatedProduct = await Product.findByIdAndUpdate(
-            req.params.id,
-            { status: normalizedStatus },
-            { new: true }
-        );
-
-        if (!updatedProduct) {
-            return res.status(404).json({ success: false, message: "Product not found" });
-        }
-
-        res.status(200).json({
-            success: true,
-            message: "Status updated successfully",
-            data: updatedProduct
-        });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
-};
 
 exports.getActiveProducts = async (req, res) => {
     try {
@@ -409,61 +586,6 @@ exports.getProductsByVendordata = async (req, res) => {
     }
 };
 
-// exports.searchProducts = async (req, res) => {
-//     try {
-//         const {
-//             keyword,
-//             categoryId,
-//             subcategoryId,
-//             subsubcategoryId,
-//             vendorId,
-//             status,
-//             minPrice,
-//             maxPrice
-//         } = req.query;
-
-//         let filter = {};
-
-//         if (keyword) {
-//             filter.productTitle = {
-//                 $regex: keyword,
-//                 $options: "i" 
-//             };
-//         }
-
-//         if (categoryId) filter.categoryId = categoryId;
-//         if (subcategoryId) filter.subcategoryId = subcategoryId;
-//         if (subsubcategoryId) filter.subsubcategoryId = subsubcategoryId;
-
-//         if (vendorId) filter.vendorId = vendorId;
-
-//         if (status) {
-//             filter.status = status.toLowerCase() === "active" ? "Active" : "Inactive";
-//         }
-
-//         if (minPrice || maxPrice) {
-//             filter.pricePerUnit = {};
-//             if (minPrice) filter.pricePerUnit.$gte = Number(minPrice);
-//             if (maxPrice) filter.pricePerUnit.$lte = Number(maxPrice);
-//         }
-
-//         const products = await Product.find(filter)
-//             .sort({ createdAt: -1 });
-
-//         res.status(200).json({
-//             success: true,
-//             count: products.length,
-//             data: products
-//         });
-
-//     } catch (err) {
-//         console.error("Search Products Error:", err);
-//         res.status(500).json({
-//             success: false,
-//             message: "Failed to search products"
-//         });
-//     }
-// };
 
 
 exports.searchProducts = async (req, res) => {
@@ -483,59 +605,45 @@ exports.searchProducts = async (req, res) => {
             talukVillage,
         } = req.query;
 
-        const filter = {};
+        let filter = {};
 
-        // ✅ Keyword search (productTitle)
-        if (keyword && keyword.trim()) {
-            filter.productTitle = { $regex: keyword.trim(), $options: "i" };
+        if (keyword) {
+            filter.productTitle = {
+                $regex: keyword,
+                $options: "i"
+            };
         }
 
-        // ✅ Category filters
         if (categoryId) filter.categoryId = categoryId;
         if (subcategoryId) filter.subcategoryId = subcategoryId;
         if (subsubcategoryId) filter.subsubcategoryId = subsubcategoryId;
 
-        // ✅ Vendor
         if (vendorId) filter.vendorId = vendorId;
 
-        // ✅ Status
         if (status) {
-            const s = String(status).toLowerCase();
-            if (s === "active") filter.status = "Active";
-            else if (s === "inactive") filter.status = "Inactive";
-            // else ignore invalid value
+            filter.status = status.toLowerCase() === "active" ? "Active" : "Inactive";
         }
 
-        // ✅ Price range
         if (minPrice || maxPrice) {
             filter.pricePerUnit = {};
-            if (minPrice !== undefined) filter.pricePerUnit.$gte = Number(minPrice);
-            if (maxPrice !== undefined) filter.pricePerUnit.$lte = Number(maxPrice);
+            if (minPrice) filter.pricePerUnit.$gte = Number(minPrice);
+            if (maxPrice) filter.pricePerUnit.$lte = Number(maxPrice);
         }
 
-        // ✅ Location filters
-        // NOTE: If these fields are nested like product.location.state,
-        // change to: filter["location.state"] = ...
-        if (state) filter.state = { $regex: String(state).trim(), $options: "i" };
-        if (cityDistrict)
-            filter.cityDistrict = { $regex: String(cityDistrict).trim(), $options: "i" };
-        if (talukVillage)
-            filter.talukVillage = { $regex: String(talukVillage).trim(), $options: "i" };
-        if (pincode) filter.pincode = String(pincode).trim();
+        const products = await Product.find(filter)
+            .sort({ createdAt: -1 });
 
-        const products = await Product.find(filter).sort({ createdAt: -1 });
-
-        return res.status(200).json({
+        res.status(200).json({
             success: true,
             count: products.length,
-            data: products,
+            data: products
         });
+
     } catch (err) {
         console.error("Search Products Error:", err);
-        return res.status(500).json({
+        res.status(500).json({
             success: false,
-            message: "Failed to search products",
-            error: err.message,
+            message: "Failed to search products"
         });
     }
 };

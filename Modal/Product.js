@@ -20,6 +20,7 @@ const productSchema = new mongoose.Schema(
         weightUnitName: { type: String },
 
         quantity: { type: Number },
+        availableQuantity: { type: Number, default: 0, min: 0 },
         pricePerUnit: { type: Number },
         advancePayment: { type: Number },
 
@@ -43,34 +44,25 @@ const productSchema = new mongoose.Schema(
 
         availableDate: {
             type: Date,
-            required: true,
+            // required: true,
         },
 
         productImage: { type: String },
 
         agreeTermsAndCondition: { type: Boolean, default: false },
-        // lockedBy: {
-        //     type: mongoose.Schema.Types.ObjectId,
-        //     ref: "Trader",
-        //     default: null
-        // },
-        // lockExpiresAt: {
-        //     type: Date,
-        //     default: null
-        // },
 
-isLocked: { 
-    type: Boolean, 
-    default: false 
-},
-lockedBy: { 
-    type: String, 
-    default: null 
-},
-lockExpiresAt: { 
-    type: Date, 
-    default: null 
-},
+        isLocked: {
+            type: Boolean,
+            default: false
+        },
+        lockedBy: {
+            type: String,
+            default: null
+        },
+        lockExpiresAt: {
+            type: Date,
+            default: null
+        },
         status: { type: String, enum: ["Active", "Inactive"], default: "Inactive" },
     },
     { timestamps: true }

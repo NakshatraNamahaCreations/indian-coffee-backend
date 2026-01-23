@@ -123,9 +123,78 @@ exports.createProduct = async (req, res) => {
   }
 };
 
-/**
- * 2) ADMIN APPROVE (pending_admin -> admin_approved, status=Inactive)
- */
+
+exports.placeOrUpdateOffer = async (req, res) => {
+  try {
+    const requirementId = String(req.params.requirementId || "").trim();
+    const { farmerId, offeredQuantity, offeredPricePerUnit, note } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(requirementId)) {
+      return res.status(400).json({ success: false, message: "Invalid requirementId" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(farmerId)) {
+      return res.status(400).json({ success: false, message: "Invalid farmerId" });
+    }
+
+    const qtyNum = Number(offeredQuantity || 0);
+    const priceNum = Number(offeredPricePerUnit || 0);
+
+    if (qtyNum <= 0) {
+      return res.status(400).json({ success: false, message: "offeredQuantity must be > 0" });
+    }
+    if (priceNum <= 0) {
+      return res.status(400).json({ success: false, message: "offeredPricePerUnit must be > 0" });
+    }
+
+    const reqDoc = await Requirement.findById(requirementId);
+    if (!reqDoc) {
+      return res.status(404).json({ success: false, message: "Requirement not found" });
+    }
+
+    // Optional: allow bidding only if requirement is Active + admin_approved
+    if (reqDoc.status !== "Active") {
+      return res.status(400).json({ success: false, message: "Requirement is not active" });
+    }
+
+    // ✅ check if farmer already exists in vendorData
+    const existsIdx = (reqDoc.vendorData || []).findIndex(
+      (v) => String(v.vendorId) === String(farmerId) && v.refre === "farmer"
+    );
+
+    if (existsIdx >= 0) {
+      // ✅ update existing offer
+      reqDoc.vendorData[existsIdx].offeredQuantity = qtyNum;
+      reqDoc.vendorData[existsIdx].offeredPricePerUnit = priceNum;
+      reqDoc.vendorData[existsIdx].note = String(note || "");
+      reqDoc.vendorData[existsIdx].vendorStatus = "pending";
+      reqDoc.vendorData[existsIdx].updatedAt = new Date();
+    } else {
+      // ✅ push new offer
+      reqDoc.vendorData.push({
+        vendorId: farmerId,
+        refre: "farmer",
+        offeredQuantity: qtyNum,
+        offeredPricePerUnit: priceNum,
+        note: String(note || ""),
+        vendorStatus: "pending",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+
+    await reqDoc.save();
+
+    return res.status(200).json({
+      success: true,
+      message: existsIdx >= 0 ? "Offer updated" : "Offer placed",
+      data: reqDoc,
+    });
+  } catch (err) {
+    console.error("placeOrUpdateOffer error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 exports.adminApproveProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -161,10 +230,7 @@ exports.adminApproveProduct = async (req, res) => {
   }
 };
 
-/**
- * 3) FARMER ACCEPT (admin_approved -> farmer_accepted) + push vendorData
- *    ✅ vendorStatus comes separately in body
- */
+
 exports.farmerAcceptProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -214,9 +280,7 @@ exports.farmerAcceptProduct = async (req, res) => {
   }
 };
 
-/**
- * 4) FINAL ADMIN APPROVE (farmer_accepted -> final_admin_approved, status=Active)
- */
+
 exports.finalAdminApproveProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -290,7 +354,6 @@ exports.getallrequirement = async (req, res) => {
 };
 
 
-// ADMIN pending list
 exports.listPendingAdmin = async (req, res) => {
   try {
     const list = await Requirement.find({

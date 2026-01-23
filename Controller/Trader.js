@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const Trader = require("../Modal/Trader");
 const Otp = require("../Modal/Otp");
 const sendOtpSms = require("../utils/sendOtpSms");
+const sendPushNotification = require("../utilstrader/sendPushNotification")
 
 // const normalizeMobile = (m = "") =>
 //     String(m).replace(/\D/g, "").replace(/^91/, "").trim();
@@ -595,6 +596,39 @@ exports.delete = async (req, res) => {
 };
 
 
+// exports.updateStatus = async (req, res) => {
+//     try {
+//         const { id } = req.params;
+
+//         const farmer = await Trader.findById(id);
+//         if (!farmer) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Farmer not found",
+//             });
+//         }
+
+//         farmer.status = farmer.status === "Active" ? "Inactive" : "Active";
+
+//         await farmer.save();
+
+//         const responseData = farmer.toObject();
+//         delete responseData.password;
+
+//         res.json({
+//             success: true,
+//             message: `Farmer status updated to ${farmer.status}`,
+//             data: responseData,
+//         });
+//     } catch (err) {
+//         console.error("Toggle Status Error:", err);
+//         res.status(500).json({
+//             success: false,
+//             message: "Failed to update status",
+//         });
+//     }
+// };
+
 exports.updateStatus = async (req, res) => {
     try {
         const { id } = req.params;
@@ -608,27 +642,47 @@ exports.updateStatus = async (req, res) => {
         }
 
         farmer.status = farmer.status === "Active" ? "Inactive" : "Active";
-
         await farmer.save();
+
+        try {
+            if (farmer.fcmToken) {
+                const title =
+                    farmer.status === "Active"
+                        ? "Account Approved ✅"
+                        : "Account Deactivated ❌";
+
+                const body =
+                    farmer.status === "Active"
+                        ? "Admin approved your account. You can start using the app."
+                        : "Your account has been deactivated by admin. Please contact support.";
+
+                await sendPushNotification(
+                    farmer.fcmToken,
+                    title,
+                    body
+                );
+            }
+        } catch (pushErr) {
+            console.error("Push notification failed:", pushErr.message);
+        }
 
         const responseData = farmer.toObject();
         delete responseData.password;
+        console.log("responseData", responseData)
 
-        res.json({
+        return res.json({
             success: true,
             message: `Farmer status updated to ${farmer.status}`,
             data: responseData,
         });
     } catch (err) {
         console.error("Toggle Status Error:", err);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Failed to update status",
         });
     }
 };
-
-
 
 exports.changePassword = async (req, res) => {
     try {

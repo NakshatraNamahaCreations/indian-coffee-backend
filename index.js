@@ -65,7 +65,7 @@ app.use("/api/favorite", favoriteRoute);
 app.use("/api/payment", PaymentRoute);
 app.use("/api/farmer", farmerRoute);
 app.use("/api/requirement", requirementRoute);
-app.use("/api/farmerbanner",farmerbannerRoute);
+app.use("/api/farmerbanner", farmerbannerRoute);
 
 const PORT = process.env.PORT || 8000;
 require("./corn/unlockProduct");
