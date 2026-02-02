@@ -1,111 +1,9 @@
 const { default: mongoose } = require('mongoose');
-// const Trader = require('../Modal/Trader');
 const bcrypt = require('bcryptjs');
-// const Otp = require("../Modal/Otp");
-// const sendOtpSms = require("../utils/sendOtpSms");
 const Trader = require("../Modal/Trader");
 const Otp = require("../Modal/Otp");
 const sendOtpSms = require("../utils/sendOtpSms");
 const sendPushNotification = require("../utilstrader/sendPushNotification")
-
-// const normalizeMobile = (m = "") =>
-//     String(m).replace(/\D/g, "").replace(/^91/, "").trim();
-
-
-// exports.sendLoginOtp = async (req, res) => {
-//     try {
-//         const { mobileNumber } = req.body;
-
-//         if (!mobileNumber) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "Mobile number is required",
-//             });
-//         }
-
-//         const farmer = await Trader.findOne({ mobileNumber });
-//         if (!farmer) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: "Mobile number not registered",
-//             });
-//         }
-
-//         const otp = Math.floor(1000 + Math.random() * 9000).toString();
-
-//         await Otp.deleteMany({ mobileNumber });
-
-//         await Otp.create({
-//             mobileNumber,
-//             otp,
-//             expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-//         });
-
-//         await sendOtpSms(mobileNumber, otp);
-
-//         res.status(200).json({
-//             success: true,
-//             message: "OTP sent for login",
-//         });
-
-//     } catch (error) {
-//         console.error("Login OTP Error:", error);
-//         res.status(500).json({
-//             success: false,
-//             message: "Failed to send OTP",
-//         });
-//     }
-// };
-
-// exports.verifyOtpAndLogin = async (req, res) => {
-//     try {
-//         const { mobileNumber, otp } = req.body;
-
-//         if (!mobileNumber || !otp) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "Mobile number and OTP are required",
-//             });
-//         }
-
-//         const otpRecord = await Otp.findOne({ mobileNumber, otp });
-
-//         if (!otpRecord) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "Invalid OTP",
-//             });
-//         }
-
-//         if (otpRecord.expiresAt < new Date()) {
-//             await Otp.deleteOne({ _id: otpRecord._id });
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "OTP expired",
-//             });
-//         }
-
-//         await Otp.deleteOne({ _id: otpRecord._id });
-
-//         const farmer = await Trader.findOne({ mobileNumber }).select("-password");
-
-//         res.status(200).json({
-//             success: true,
-//             message: "Login successful",
-//             data: farmer,
-//         });
-
-//     } catch (error) {
-//         console.error("Verify OTP Login Error:", error);
-//         res.status(500).json({
-//             success: false,
-//             message: "Login failed",
-//         });
-//     }
-// };
-
-
-
 
 const isValidIndian10Digit = (m = "") => /^[6-9]\d{9}$/.test(String(m).trim());
 
@@ -113,7 +11,6 @@ exports.sendLoginOtp = async (req, res) => {
     try {
         const mobileNumber = String(req.body?.mobileNumber || "").trim();
 
-        // ✅ STRICT: Reject if not exactly 10-digit (no +91 / 91)
         if (!isValidIndian10Digit(mobileNumber)) {
             return res.status(400).json({
                 success: false,
@@ -132,12 +29,10 @@ exports.sendLoginOtp = async (req, res) => {
         const otp = String(Math.floor(1000 + Math.random() * 9000));
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-        // keep only latest OTP
         await Otp.deleteMany({ mobileNumber });
 
         await Otp.create({ mobileNumber, otp, expiresAt });
 
-        // send OTP to same 10-digit number (provider should accept)
         await sendOtpSms(mobileNumber, otp);
 
         return res.status(200).json({
@@ -158,7 +53,6 @@ exports.verifyOtpAndLogin = async (req, res) => {
         const mobileNumber = String(req.body?.mobileNumber || "").trim();
         const otp = String(req.body?.otp || "").trim();
 
-        // ✅ STRICT: 10-digit only, OTP required
         if (!isValidIndian10Digit(mobileNumber) || !/^\d{4}$/.test(otp)) {
             return res.status(400).json({
                 success: false,
@@ -166,7 +60,6 @@ exports.verifyOtpAndLogin = async (req, res) => {
             });
         }
 
-        // latest OTP for this number
         const otpRecord = await Otp.findOne({ mobileNumber }).sort({ createdAt: -1 });
 
         if (!otpRecord) {
@@ -191,7 +84,6 @@ exports.verifyOtpAndLogin = async (req, res) => {
             });
         }
 
-        // OTP used -> delete
         await Otp.deleteMany({ mobileNumber });
 
         const farmer = await Trader.findOne({ mobileNumber }).select("-password");
@@ -260,13 +152,11 @@ exports.register = async (req, res) => {
             pincode,
             address,
             termsAccepted,
-
             firstName,
             lastName,
             businessName,
             panNumber,
             gstNumber,
-
             aadhaarFront: files.aadhaarFront?.[0]?.path || null,
             aadhaarBack: files.aadhaarBack?.[0]?.path || null,
             panImage: files.panImage?.[0]?.path || null,
@@ -495,11 +385,6 @@ exports.edit = async (req, res) => {
 };
 
 
-
-
-
-
-
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -548,18 +433,7 @@ exports.getAll = async (req, res) => {
     }
 };
 
-// exports.getById = async (req, res) => {
-//     try {
-//         const { id } = req.params;
-//         const trader = await Trader.findById(id);
-//         if (!trader) {
-//             return res.status(404).json({ error: 'Trader not found' });
-//         }
-//         res.json(trader);
-//     } catch (err) {
-//         res.status(500).json({ error: 'Failed to fetch trader' });
-//     }
-// };
+
 
 exports.getById = async (req, res) => {
     try {
@@ -596,38 +470,7 @@ exports.delete = async (req, res) => {
 };
 
 
-// exports.updateStatus = async (req, res) => {
-//     try {
-//         const { id } = req.params;
 
-//         const farmer = await Trader.findById(id);
-//         if (!farmer) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: "Farmer not found",
-//             });
-//         }
-
-//         farmer.status = farmer.status === "Active" ? "Inactive" : "Active";
-
-//         await farmer.save();
-
-//         const responseData = farmer.toObject();
-//         delete responseData.password;
-
-//         res.json({
-//             success: true,
-//             message: `Farmer status updated to ${farmer.status}`,
-//             data: responseData,
-//         });
-//     } catch (err) {
-//         console.error("Toggle Status Error:", err);
-//         res.status(500).json({
-//             success: false,
-//             message: "Failed to update status",
-//         });
-//     }
-// };
 
 exports.updateStatus = async (req, res) => {
     try {
@@ -688,7 +531,6 @@ exports.changePassword = async (req, res) => {
     try {
         const { userId, oldPassword, newPassword } = req.body;
 
-        // 1️⃣ Validate input
         if (!userId || !oldPassword || !newPassword) {
             return res.status(400).json({
                 success: false,
@@ -696,9 +538,6 @@ exports.changePassword = async (req, res) => {
             });
         }
 
-
-
-        // 2️⃣ Find user
         const farmer = await Trader.findById(userId);
         if (!farmer) {
             return res.status(404).json({
@@ -707,7 +546,6 @@ exports.changePassword = async (req, res) => {
             });
         }
 
-        // 3️⃣ Check old password
         const isMatch = await bcrypt.compare(oldPassword, farmer.password);
         if (!isMatch) {
             return res.status(400).json({
@@ -716,10 +554,8 @@ exports.changePassword = async (req, res) => {
             });
         }
 
-        // 4️⃣ Hash new password
         const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
-        // 5️⃣ Update password
         farmer.password = hashedNewPassword;
         await farmer.save();
 
@@ -736,8 +572,6 @@ exports.changePassword = async (req, res) => {
         });
     }
 };
-
-
 
 exports.saveFcmToken = async (req, res) => {
     try {

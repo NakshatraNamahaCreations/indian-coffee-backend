@@ -22,7 +22,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({ dest: 'uploads/' });
 
-/* FILE FIELDS */
 const cpUpload = upload.fields([
     { name: "aadhaarFront", maxCount: 1 },
     { name: "aadhaarBack", maxCount: 1 },
@@ -31,7 +30,6 @@ const cpUpload = upload.fields([
     { name: "registrationDocs", maxCount: 10 },
 ]);
 
-/* ROUTES */
 router.post("/traderregister", cpUpload, ctrl.register);
 router.post("/traderregister1", ctrl.register1);
 router.put("/:id", cpUpload, ctrl.edit);
@@ -44,7 +42,6 @@ router.post("/change-password", ctrl.changePassword);
 router.post("/trader/login/send-otp", ctrl.sendLoginOtp);
 router.post("/trader/login/verify-otp", ctrl.verifyOtpAndLogin);
 router.post("/trader/save-fcm-token", ctrl.saveFcmToken);
-
 
 module.exports = router;
 

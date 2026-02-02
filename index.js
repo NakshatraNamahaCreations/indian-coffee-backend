@@ -18,7 +18,6 @@ mongoose
     .catch((err) => console.log("Database Not connected !!!", err));
 
 
-// app.use('/uploads', express.static('uploads'));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 
@@ -47,8 +46,6 @@ const farmerRoute = require("./Route/Farmer");
 const requirementRoute = require("./Route/Addrequirement");
 const farmerbannerRoute = require("./Route/Farmerbanner");
 
-
-
 app.use("/api", adminRoute);
 app.use("/api", categoryRoute);
 app.use("/api", VendorRoute);
@@ -70,8 +67,10 @@ app.use("/api/farmerbanner", farmerbannerRoute);
 const PORT = process.env.PORT || 8000;
 require("./corn/unlockProduct");
 
-app.get("/", (req, res) => {
+app.get("/test", (req, res) => {
+
     res.status(200).json({ message: "Welcome to Suman Back end" });
+
 });
 
 app.listen(PORT, () => {

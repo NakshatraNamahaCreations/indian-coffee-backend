@@ -1,4 +1,5 @@
 const DailyMarketPrice = require("../Modal/Dailymarketprice");
+const mongoose = require("mongoose");
 
 exports.createDailyMarketPrice = async (req, res) => {
     try {
@@ -51,114 +52,6 @@ exports.getAllDailyMarketPricesAdmin = async (req, res) => {
         });
     }
 };
-
-
-// exports.getLatestAvailableHighestPriceAdmin = async (req, res) => {
-//     try {
-//         const now = new Date();
-
-//         const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
-//         const startOfTomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
-
-//         const startOfYesterday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1, 0, 0, 0));
-//         const startOfTodayAgain = startOfToday;
-
-//         // ✅ For a date range, return max price for each (categoryName + dailycategoryName)
-//         const getMaxPerItemForRange = async (from, to) => {
-//             const result = await DailyMarketPrice.aggregate([
-//                 {
-//                     $match: {
-//                         type: "admin",
-//                         date: { $gte: from, $lt: to },
-//                     },
-//                 },
-//                 { $unwind: "$categories" },
-//                 { $unwind: "$categories.dailyCategories" },
-//                 {
-//                     $project: {
-//                         date: 1,
-//                         categoryName: "$categories.categoryName",
-//                         dailycategoryName: "$categories.dailyCategories.dailycategoryName",
-//                         price: "$categories.dailyCategories.price",
-//                     },
-//                 },
-
-//                 // ✅ group by item, take max price
-//                 {
-//                     $group: {
-//                         _id: {
-//                             categoryName: "$categoryName",
-//                             dailycategoryName: "$dailycategoryName",
-//                         },
-//                         maxPrice: { $max: "$price" },
-//                         date: { $first: "$date" },
-//                     },
-//                 },
-
-//                 // optional sorting
-//                 { $sort: { maxPrice: -1 } },
-
-//                 // cleaner output
-//                 {
-//                     $project: {
-//                         _id: 0,
-//                         date: 1,
-//                         categoryName: "$_id.categoryName",
-//                         dailycategoryName: "$_id.dailycategoryName",
-//                         price: "$maxPrice",
-//                     },
-//                 },
-//             ]);
-
-//             return result || [];
-//         };
-
-//         let usedDateRange = { from: startOfToday, to: startOfTomorrow };
-//         let data = await getMaxPerItemForRange(usedDateRange.from, usedDateRange.to);
-
-//         // ✅ If today not found -> yesterday
-//         if (!data.length) {
-//             usedDateRange = { from: startOfYesterday, to: startOfTodayAgain };
-//             data = await getMaxPerItemForRange(usedDateRange.from, usedDateRange.to);
-//         }
-
-//         // ✅ If yesterday not found -> latest date in DB
-//         if (!data.length) {
-//             const latestDoc = await DailyMarketPrice.findOne({ type: "admin" })
-//                 .sort({ date: -1 })
-//                 .select("date");
-
-//             if (!latestDoc?.date) {
-//                 return res.status(200).json({
-//                     success: true,
-//                     message: "No data found",
-//                     usedDate: null,
-//                     data: [],
-//                 });
-//             }
-
-//             const latestDate = new Date(latestDoc.date);
-//             const start = new Date(Date.UTC(latestDate.getUTCFullYear(), latestDate.getUTCMonth(), latestDate.getUTCDate(), 0, 0, 0));
-//             const end = new Date(Date.UTC(latestDate.getUTCFullYear(), latestDate.getUTCMonth(), latestDate.getUTCDate() + 1, 0, 0, 0));
-
-//             usedDateRange = { from: start, to: end };
-//             data = await getMaxPerItemForRange(start, end);
-//         }
-
-//         return res.status(200).json({
-//             success: true,
-//             usedDateFrom: usedDateRange.from,
-//             usedDateTo: usedDateRange.to,
-//             data, // ✅ array: max price per categoryName+dailycategoryName for that date
-//         });
-//     } catch (error) {
-//         console.error("getLatestAvailableHighestPriceAdmin Error:", error);
-//         return res.status(500).json({
-//             success: false,
-//             message: "Server error",
-//         });
-//     }
-// };
 
 exports.getLatestAvailableHighestPriceAdmin = async (req, res) => {
     try {
@@ -257,6 +150,193 @@ exports.getLatestAvailableHighestPriceAdmin = async (req, res) => {
         });
     } catch (error) {
         console.error("getLatestPricesWithChangeAdmin Error:", error);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+exports.getLatestAvailableHighestPriceByUserParam = async (req, res) => {
+    try {
+        const userId = req.params?.userId;
+
+        if (!userId) {
+            return res
+                .status(400)
+                .json({ success: false, message: "userId is required in params" });
+        }
+
+        // ✅ We will match BOTH possibilities:
+        // 1) userId stored as string
+        // 2) userId stored as ObjectId
+        const canBeObjectId = mongoose.Types.ObjectId.isValid(userId);
+        const userObjectId = canBeObjectId ? new mongoose.Types.ObjectId(userId) : null;
+
+        const userMatch = canBeObjectId
+            ? { $or: [{ userId: userId }, { userId: userObjectId }] }
+            : { userId: userId };
+
+        const now = new Date();
+
+        const startOfToday = new Date(
+            Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0)
+        );
+        const startOfTomorrow = new Date(
+            Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0)
+        );
+
+        const startOfYesterday = new Date(
+            Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1, 0, 0, 0)
+        );
+
+        const getMaxPerItemForRange = async (from, to) => {
+            try {
+                return await DailyMarketPrice.aggregate([
+                    {
+                        $match: {
+                            ...userMatch,
+                            // ✅ If you want ONLY admin data, uncomment next line
+                            // type: "admin",
+                            date: { $gte: from, $lt: to },
+                        },
+                    },
+                    { $unwind: "$categories" },
+                    { $unwind: "$categories.dailyCategories" },
+                    {
+                        $project: {
+                            date: 1,
+                            categoryName: "$categories.categoryName",
+                            dailycategoryName: "$categories.dailyCategories.dailycategoryName",
+                            price: "$categories.dailyCategories.price",
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: {
+                                categoryName: "$categoryName",
+                                dailycategoryName: "$dailycategoryName",
+                            },
+                            maxPrice: { $max: "$price" },
+                            date: { $first: "$date" },
+                        },
+                    },
+                    { $sort: { maxPrice: -1 } },
+                    {
+                        $project: {
+                            _id: 0,
+                            date: 1,
+                            categoryName: "$_id.categoryName",
+                            dailycategoryName: "$_id.dailycategoryName",
+                            price: "$maxPrice",
+                        },
+                    },
+                ]);
+            } catch (err) {
+                console.log("getMaxPerItemForRange error:", err);
+                return [];
+            }
+        };
+
+        // ✅ 1) Latest available date (today -> yesterday -> latest doc)
+        let usedFrom = startOfToday;
+        let usedTo = startOfTomorrow;
+
+        let todayList = await getMaxPerItemForRange(usedFrom, usedTo);
+
+        if (!todayList.length) {
+            usedFrom = startOfYesterday;
+            usedTo = startOfToday;
+            todayList = await getMaxPerItemForRange(usedFrom, usedTo);
+        }
+
+        if (!todayList.length) {
+            const latestDoc = await DailyMarketPrice.findOne({
+                ...userMatch,
+                // type: "admin",
+            })
+                .sort({ date: -1 })
+                .select("date");
+
+            if (!latestDoc?.date) {
+                return res.status(200).json({
+                    success: true,
+                    usedDateFrom: null,
+                    usedDateTo: null,
+                    previousDateFrom: null,
+                    previousDateTo: null,
+                    todayData: [],
+                    previousData: [],
+                    todayDataWithChange: [],
+                });
+            }
+
+            const d = new Date(latestDoc.date);
+            usedFrom = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0));
+            usedTo = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0));
+
+            todayList = await getMaxPerItemForRange(usedFrom, usedTo);
+        }
+
+        // ✅ 2) Previous available date before usedFrom
+        const prevDoc = await DailyMarketPrice.findOne({
+            ...userMatch,
+            // type: "admin",
+            date: { $lt: usedFrom },
+        })
+            .sort({ date: -1 })
+            .select("date");
+
+        let prevFrom = null;
+        let prevTo = null;
+        let prevList = [];
+
+        if (prevDoc?.date) {
+            const pd = new Date(prevDoc.date);
+            prevFrom = new Date(Date.UTC(pd.getUTCFullYear(), pd.getUTCMonth(), pd.getUTCDate(), 0, 0, 0));
+            prevTo = new Date(Date.UTC(pd.getUTCFullYear(), pd.getUTCMonth(), pd.getUTCDate() + 1, 0, 0, 0));
+
+            prevList = await getMaxPerItemForRange(prevFrom, prevTo);
+        }
+
+        // ✅ 3) Compute change
+        const prevMap = new Map();
+        (prevList || []).forEach((x) => {
+            const key = `${x.categoryName}||${x.dailycategoryName}`;
+            prevMap.set(key, Number(x.price));
+        });
+
+        const todayDataWithChange = (todayList || []).map((x) => {
+            const key = `${x.categoryName}||${x.dailycategoryName}`;
+            const prevPrice = prevMap.has(key) ? prevMap.get(key) : null;
+
+            let change = null;
+            let changeType = "new";
+
+            if (prevPrice !== null) {
+                change = Number(x.price) - Number(prevPrice);
+                if (change > 0) changeType = "up";
+                else if (change < 0) changeType = "down";
+                else changeType = "same";
+            }
+
+            return {
+                ...x,
+                previousPrice: prevPrice,
+                change,
+                changeType,
+            };
+        });
+
+        return res.status(200).json({
+            success: true,
+            usedDateFrom: usedFrom,
+            usedDateTo: usedTo,
+            previousDateFrom: prevFrom,
+            previousDateTo: prevTo,
+            todayData: todayList,
+            previousData: prevList,
+            todayDataWithChange,
+        });
+    } catch (error) {
+        console.error("getLatestAvailableHighestPriceByUserParam Error:", error);
         return res.status(500).json({ success: false, message: "Server error" });
     }
 };

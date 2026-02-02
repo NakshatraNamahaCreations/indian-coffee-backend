@@ -1,4 +1,3 @@
-// Controller/Addrequirement.js
 const { default: mongoose } = require("mongoose");
 const Requirement = require("../Modal/Addrequirement");
 const Category = require("../Modal/Category");
@@ -6,9 +5,7 @@ const Subcategory = require("../Modal/Subcategory");
 const Subsubcategory = require("../Modal/Subsubcategory");
 const WeightUnit = require("../Modal/Weightunit");
 
-/**
- * 1) CREATE REQUIREMENT (Trader creates requirement)
- */
+
 exports.createProduct = async (req, res) => {
   try {
     console.log("🔥 HIT /createrequirement");
@@ -25,13 +22,10 @@ exports.createProduct = async (req, res) => {
       pricePerUnit,
       desc,
       userId,
-
-      // ✅ new fields
       availableQuantity,
       inventory,
     } = req.body;
 
-    // Basic validation
     if (
       !productTitle ||
       !categoryId ||
@@ -48,14 +42,11 @@ exports.createProduct = async (req, res) => {
       });
     }
 
-    // Image path (if file uploaded)
     let productImage = "";
     if (req.file) {
-      // We will serve /uploads as static → store public path
       productImage = `/uploads/products/${req.file.filename}`;
     }
 
-    // Fetch related documents in parallel
     const [category, subcategory, weightUnit] = await Promise.all([
       Category.findById(categoryId),
       Subcategory.findById(subcategoryId),
@@ -67,7 +58,6 @@ exports.createProduct = async (req, res) => {
       subsubcategory = await Subsubcategory.findById(subsubcategoryId);
     }
 
-    // Convert numeric fields safely
     const qtyNum = Number(quantity) || 0;
     const priceNum = Number(pricePerUnit) || 0;
     const availableQtyNum =
@@ -79,7 +69,6 @@ exports.createProduct = async (req, res) => {
         ? Number(inventory)
         : qtyNum;
 
-    // Create requirement document
     const requirement = await Requirement.create({
       productTitle,
 
@@ -98,7 +87,6 @@ exports.createProduct = async (req, res) => {
       quantity: qtyNum,
       pricePerUnit: priceNum,
 
-      // ✅ new fields
       availableQuantity: availableQtyNum,
       inventory: inventoryNum,
 
@@ -152,25 +140,21 @@ exports.placeOrUpdateOffer = async (req, res) => {
       return res.status(404).json({ success: false, message: "Requirement not found" });
     }
 
-    // Optional: allow bidding only if requirement is Active + admin_approved
     if (reqDoc.status !== "Active") {
       return res.status(400).json({ success: false, message: "Requirement is not active" });
     }
 
-    // ✅ check if farmer already exists in vendorData
     const existsIdx = (reqDoc.vendorData || []).findIndex(
       (v) => String(v.vendorId) === String(farmerId) && v.refre === "farmer"
     );
 
     if (existsIdx >= 0) {
-      // ✅ update existing offer
       reqDoc.vendorData[existsIdx].offeredQuantity = qtyNum;
       reqDoc.vendorData[existsIdx].offeredPricePerUnit = priceNum;
       reqDoc.vendorData[existsIdx].note = String(note || "");
       reqDoc.vendorData[existsIdx].vendorStatus = "pending";
       reqDoc.vendorData[existsIdx].updatedAt = new Date();
     } else {
-      // ✅ push new offer
       reqDoc.vendorData.push({
         vendorId: farmerId,
         refre: "farmer",

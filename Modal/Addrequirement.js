@@ -53,7 +53,6 @@ const requirementSchema = new mongoose.Schema(
 
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "Trader" },
 
-    // ✅ multiple farmers can bid
     vendorData: { type: [vendorDataSchema], default: [] },
 
     approvalStatus: {
