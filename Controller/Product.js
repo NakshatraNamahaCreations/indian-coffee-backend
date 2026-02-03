@@ -8,6 +8,122 @@ const sendPushNotification = require("../utils/sendPushNotification");
 const Farmer = require("../Modal/Farmer");
 const { default: mongoose } = require("mongoose");
 
+// exports.createProduct = async (req, res) => {
+//     try {
+//         const {
+//             productTitle,
+//             categoryId,
+//             subcategoryId,
+//             subsubcategoryId,
+//             weightUnitId,
+//             quantity,
+//             pricePerUnit,
+//             advancePayment,
+//             postHarvestProcess,
+//             beanSize,
+//             beanShape,
+//             cropYear,
+//             scaScore,
+//             moisture,
+//             maxDefects,
+//             minDefects,
+//             packagingForShipment,
+//             minimumQuantity,
+//             country,
+//             state,
+//             cityDistrict,
+//             pincode,
+//             talukVillage,
+//             address,
+//             availableDate,
+//             agreeTermsAndCondition,
+//             status,
+//             weightUnit,
+//             vendorName,
+//             vendorId,
+//         } = req.body;
+
+//         const normalizedStatus = status?.toLowerCase() === "active" ? "Active" : "Inactive";
+
+//         let imagePath = "";
+//         if (req.file) {
+//             imagePath = req.file.path.replace(/\\/g, "/");
+//         }
+
+//         const category = categoryId ? await Category.findById(categoryId) : null;
+//         const subcategory = subcategoryId ? await Subcategory.findById(subcategoryId) : null;
+//         const subsubcategory =
+//             subsubcategoryId && String(subsubcategoryId).trim() !== ""
+//                 ? await Subsubcategory.findById(subsubcategoryId)
+//                 : null;
+
+//         // ✅ convert quantity safely
+//         const qtyNum = Number(quantity);
+//         const safeQty = Number.isFinite(qtyNum) && qtyNum > 0 ? qtyNum : 0;
+
+//         const productData = {
+//             productTitle,
+//             categoryId,
+//             categoryName: category?.Categoryname,
+//             subcategoryId,
+//             subcategoryName: subcategory?.subcategoryName,
+
+//             subsubcategoryId: undefined,
+//             subsubcategoryName: undefined,
+
+//             weightUnitId,
+//             weightUnitName: weightUnit?.weightUnitName,
+
+//             quantity: safeQty,
+
+//             // ✅ first time set availableQuantity = quantity
+//             availableQuantity: safeQty,
+
+//             pricePerUnit,
+//             advancePayment,
+//             postHarvestProcess,
+//             beanSize,
+//             beanShape,
+//             cropYear,
+//             scaScore,
+//             moisture,
+//             maxDefects,
+//             minDefects,
+//             packagingForShipment,
+//             minimumQuantity,
+//             country,
+//             state,
+//             cityDistrict,
+//             pincode,
+//             talukVillage,
+//             address,
+//             availableDate,
+//             productImage: imagePath,
+//             agreeTermsAndCondition,
+//             status: normalizedStatus,
+//             vendorName,
+//             vendorId,
+//         };
+
+//         if (subsubcategoryId && String(subsubcategoryId).trim() !== "") {
+//             productData.subsubcategoryId = subsubcategoryId;
+//             productData.subsubcategoryName = subsubcategory?.subsubcategoryName;
+//         } else {
+//             delete productData.subsubcategoryId;
+//             delete productData.subsubcategoryName;
+//         }
+
+//         const product = new Product(productData);
+//         await product.save();
+
+//         return res.status(201).json({ success: true, data: product });
+//     } catch (err) {
+//         console.error("Create Product Error:", err);
+//         return res.status(500).json({ success: false, message: err.message });
+//     }
+// };
+
+
 exports.createProduct = async (req, res) => {
     try {
         const {
@@ -43,12 +159,11 @@ exports.createProduct = async (req, res) => {
             vendorId,
         } = req.body;
 
-        const normalizedStatus = status?.toLowerCase() === "active" ? "Active" : "Inactive";
+        const normalizedStatus = String(status || "").toLowerCase() === "active" ? "Active" : "Inactive";
 
-        let imagePath = "";
-        if (req.file) {
-            imagePath = req.file.path.replace(/\\/g, "/");
-        }
+        // ✅ MULTI FILE PATHS
+        const productImages =
+            (req.files || []).map((f) => String(f.path).replace(/\\/g, "/"));
 
         const category = categoryId ? await Category.findById(categoryId) : null;
         const subcategory = subcategoryId ? await Subcategory.findById(subcategoryId) : null;
@@ -57,7 +172,6 @@ exports.createProduct = async (req, res) => {
                 ? await Subsubcategory.findById(subsubcategoryId)
                 : null;
 
-        // ✅ convert quantity safely
         const qtyNum = Number(quantity);
         const safeQty = Number.isFinite(qtyNum) && qtyNum > 0 ? qtyNum : 0;
 
@@ -75,8 +189,6 @@ exports.createProduct = async (req, res) => {
             weightUnitName: weightUnit?.weightUnitName,
 
             quantity: safeQty,
-
-            // ✅ first time set availableQuantity = quantity
             availableQuantity: safeQty,
 
             pricePerUnit,
@@ -98,7 +210,10 @@ exports.createProduct = async (req, res) => {
             talukVillage,
             address,
             availableDate,
-            productImage: imagePath,
+
+            // ✅ MULTIPLE IMAGES
+            productImages,
+
             agreeTermsAndCondition,
             status: normalizedStatus,
             vendorName,
@@ -122,135 +237,6 @@ exports.createProduct = async (req, res) => {
         return res.status(500).json({ success: false, message: err.message });
     }
 };
-
-
-// exports.createProduct = async (req, res) => {
-//     try {
-//         const {
-//             productTitle,
-//             categoryId,
-//             subcategoryId,
-//             subsubcategoryId,
-//             weightUnitId,
-//             quantity,
-//             pricePerUnit,
-//             advancePayment,
-//             postHarvestProcess,
-//             beanSize,
-//             beanShape,
-//             cropYear,
-//             scaScore,
-//             moisture,
-//             maxDefects,
-//             minDefects,
-//             packagingForShipment,
-//             minimumQuantity,
-//             country,
-//             state,
-//             cityDistrict,
-//             pincode,
-//             talukVillage,
-//             address,
-//             availableDate,
-//             agreeTermsAndCondition,
-//             status,
-//             weightUnit,
-//             vendorName,
-//             vendorId
-//         } = req.body;
-
-//         console.log("req.body", req.body)
-
-//         const normalizedStatus = status?.toLowerCase() === 'active' ? 'Active' : 'Inactive';
-
-//         let imagePath = "";
-//         if (req.file) {
-//             imagePath = req.file.path.replace(/\\/g, "/");
-//         }
-
-//         const category = categoryId ? await Category.findById(categoryId) : null;
-//         const subcategory = subcategoryId ? await Subcategory.findById(subcategoryId) : null;
-//         const subsubcategory = (subsubcategoryId && subsubcategoryId.trim() !== "")
-//             ? await Subsubcategory.findById(subsubcategoryId)
-//             : null;
-
-//         const productData = {
-//             productTitle,
-//             categoryId,
-//             categoryName: category?.Categoryname,
-//             subcategoryId,
-//             subcategoryName: subcategory?.subcategoryName,
-//             weightUnitId,
-//             weightUnitName: weightUnit?.weightUnitName,
-//             quantity,
-//             pricePerUnit,
-//             advancePayment,
-//             postHarvestProcess,
-//             beanSize,
-//             beanShape,
-//             cropYear,
-//             scaScore,
-//             moisture,
-//             maxDefects,
-//             minDefects,
-//             packagingForShipment,
-//             minimumQuantity,
-//             country,
-//             state,
-//             cityDistrict,
-//             pincode,
-//             talukVillage,
-//             address,
-//             availableDate,
-//             productImage: imagePath,
-//             agreeTermsAndCondition,
-//             status: normalizedStatus,
-//             vendorName,
-//             vendorId
-//         };
-
-//         if (subsubcategoryId && subsubcategoryId.trim() !== "") {
-//             productData.subsubcategoryId = subsubcategoryId;
-//             productData.subsubcategoryName = subsubcategory?.subsubcategoryName;
-//         }
-
-//         const product = new Product(productData);
-//         await product.save();
-
-//         res.status(201).json({ success: true, data: product });
-
-//     } catch (err) {
-//         console.error("Create Product Error:", err);
-//         res.status(500).json({ success: false, message: err.message });
-//     }
-// };
-
-
-// exports.updateProductStatus = async (req, res) => {
-//     try {
-//         const { status } = req.body;
-
-//         const normalizedStatus = status?.toLowerCase() === "active" ? "Active" : "Inactive";
-
-//         const updatedProduct = await Product.findByIdAndUpdate(
-//             req.params.id,
-//             { status: normalizedStatus },
-//             { new: true }
-//         );
-
-//         if (!updatedProduct) {
-//             return res.status(404).json({ success: false, message: "Product not found" });
-//         }
-
-//         res.status(200).json({
-//             success: true,
-//             message: "Status updated successfully",
-//             data: updatedProduct
-//         });
-//     } catch (err) {
-//         res.status(500).json({ success: false, message: err.message });
-//     }
-// };
 
 exports.updateProductStatus = async (req, res) => {
     try {
@@ -319,24 +305,43 @@ exports.getAllProducts = async (req, res) => {
 };
 
 
+// exports.updateProduct = async (req, res) => {
+//     try {
+//         const updateData = req.body;
+
+//         if (req.file) {
+//             updateData.productImage = req.file.path.replace(/\\/g, "/");
+//         }
+
+//         const product = await Product.findByIdAndUpdate(
+//             req.params.id,
+//             updateData,
+//             { new: true }
+//         );
+
+//         res.status(200).json({ success: true, data: product });
+
+//     } catch (err) {
+//         res.status(500).json({ success: false, message: err.message });
+//     }
+// };
+
 exports.updateProduct = async (req, res) => {
     try {
-        const updateData = req.body;
+        const updateData = { ...req.body };
 
-        if (req.file) {
-            updateData.productImage = req.file.path.replace(/\\/g, "/");
+        const newImages =
+            (req.files || []).map((f) => String(f.path).replace(/\\/g, "/"));
+
+        // ✅ replace only if uploaded
+        if (newImages.length > 0) {
+            updateData.productImages = newImages;
         }
 
-        const product = await Product.findByIdAndUpdate(
-            req.params.id,
-            updateData,
-            { new: true }
-        );
-
-        res.status(200).json({ success: true, data: product });
-
+        const updated = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true });
+        return res.status(200).json({ success: true, data: updated });
     } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
 
@@ -377,10 +382,6 @@ exports.getProductById = async (req, res) => {
         });
     }
 };
-
-
-
-
 
 exports.getActiveProducts = async (req, res) => {
     try {
