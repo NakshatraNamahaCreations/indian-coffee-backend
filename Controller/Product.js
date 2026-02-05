@@ -8,121 +8,6 @@ const sendPushNotification = require("../utils/sendPushNotification");
 const Farmer = require("../Modal/Farmer");
 const { default: mongoose } = require("mongoose");
 
-// exports.createProduct = async (req, res) => {
-//     try {
-//         const {
-//             productTitle,
-//             categoryId,
-//             subcategoryId,
-//             subsubcategoryId,
-//             weightUnitId,
-//             quantity,
-//             pricePerUnit,
-//             advancePayment,
-//             postHarvestProcess,
-//             beanSize,
-//             beanShape,
-//             cropYear,
-//             scaScore,
-//             moisture,
-//             maxDefects,
-//             minDefects,
-//             packagingForShipment,
-//             minimumQuantity,
-//             country,
-//             state,
-//             cityDistrict,
-//             pincode,
-//             talukVillage,
-//             address,
-//             availableDate,
-//             agreeTermsAndCondition,
-//             status,
-//             weightUnit,
-//             vendorName,
-//             vendorId,
-//         } = req.body;
-
-//         const normalizedStatus = status?.toLowerCase() === "active" ? "Active" : "Inactive";
-
-//         let imagePath = "";
-//         if (req.file) {
-//             imagePath = req.file.path.replace(/\\/g, "/");
-//         }
-
-//         const category = categoryId ? await Category.findById(categoryId) : null;
-//         const subcategory = subcategoryId ? await Subcategory.findById(subcategoryId) : null;
-//         const subsubcategory =
-//             subsubcategoryId && String(subsubcategoryId).trim() !== ""
-//                 ? await Subsubcategory.findById(subsubcategoryId)
-//                 : null;
-
-//         // ✅ convert quantity safely
-//         const qtyNum = Number(quantity);
-//         const safeQty = Number.isFinite(qtyNum) && qtyNum > 0 ? qtyNum : 0;
-
-//         const productData = {
-//             productTitle,
-//             categoryId,
-//             categoryName: category?.Categoryname,
-//             subcategoryId,
-//             subcategoryName: subcategory?.subcategoryName,
-
-//             subsubcategoryId: undefined,
-//             subsubcategoryName: undefined,
-
-//             weightUnitId,
-//             weightUnitName: weightUnit?.weightUnitName,
-
-//             quantity: safeQty,
-
-//             // ✅ first time set availableQuantity = quantity
-//             availableQuantity: safeQty,
-
-//             pricePerUnit,
-//             advancePayment,
-//             postHarvestProcess,
-//             beanSize,
-//             beanShape,
-//             cropYear,
-//             scaScore,
-//             moisture,
-//             maxDefects,
-//             minDefects,
-//             packagingForShipment,
-//             minimumQuantity,
-//             country,
-//             state,
-//             cityDistrict,
-//             pincode,
-//             talukVillage,
-//             address,
-//             availableDate,
-//             productImage: imagePath,
-//             agreeTermsAndCondition,
-//             status: normalizedStatus,
-//             vendorName,
-//             vendorId,
-//         };
-
-//         if (subsubcategoryId && String(subsubcategoryId).trim() !== "") {
-//             productData.subsubcategoryId = subsubcategoryId;
-//             productData.subsubcategoryName = subsubcategory?.subsubcategoryName;
-//         } else {
-//             delete productData.subsubcategoryId;
-//             delete productData.subsubcategoryName;
-//         }
-
-//         const product = new Product(productData);
-//         await product.save();
-
-//         return res.status(201).json({ success: true, data: product });
-//     } catch (err) {
-//         console.error("Create Product Error:", err);
-//         return res.status(500).json({ success: false, message: err.message });
-//     }
-// };
-
 
 exports.createProduct = async (req, res) => {
     try {
@@ -157,6 +42,7 @@ exports.createProduct = async (req, res) => {
             weightUnit,
             vendorName,
             vendorId,
+            weightUnitName
         } = req.body;
 
         const normalizedStatus = String(status || "").toLowerCase() === "active" ? "Active" : "Inactive";
@@ -210,10 +96,7 @@ exports.createProduct = async (req, res) => {
             talukVillage,
             address,
             availableDate,
-
-            // ✅ MULTIPLE IMAGES
             productImages,
-
             agreeTermsAndCondition,
             status: normalizedStatus,
             vendorName,
@@ -326,17 +209,44 @@ exports.getAllProducts = async (req, res) => {
 //     }
 // };
 
+// exports.updateProduct = async (req, res) => {
+//     try {
+//         const updateData = { ...req.body };
+
+//         const newImages =
+//             (req.files || []).map((f) => String(f.path).replace(/\\/g, "/"));
+
+//         // ✅ replace only if uploaded
+//         if (newImages.length > 0) {
+//             updateData.productImages = newImages;
+//         }
+
+//         const updated = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true });
+//         return res.status(200).json({ success: true, data: updated });
+//     } catch (err) {
+//         return res.status(500).json({ success: false, message: err.message });
+//     }
+// };
+
+
 exports.updateProduct = async (req, res) => {
     try {
         const updateData = { ...req.body };
 
-        const newImages =
-            (req.files || []).map((f) => String(f.path).replace(/\\/g, "/"));
-
-        // ✅ replace only if uploaded
-        if (newImages.length > 0) {
-            updateData.productImages = newImages;
+        // ✅ existingImages from frontend (after deletions)
+        let existingImages = [];
+        try {
+            if (req.body.existingImages) {
+                existingImages = JSON.parse(req.body.existingImages);
+            }
+        } catch (e) {
+            existingImages = [];
         }
+
+        const newImages = (req.files || []).map((f) => String(f.path).replace(/\\/g, "/"));
+
+        // ✅ final list = existing (after remove) + new uploads
+        updateData.productImages = [...existingImages, ...newImages];
 
         const updated = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true });
         return res.status(200).json({ success: true, data: updated });
@@ -418,7 +328,7 @@ exports.getProductsBySubcategory = async (req, res) => {
 
         const products = await Product.find({
             subcategoryId,
-            status: "Active"   // ✅ IMPORTANT
+            status: "Active"
         }).sort({ createdAt: -1 });
 
         res.status(200).json({
@@ -570,7 +480,7 @@ exports.getProductsByVendordata = async (req, res) => {
 
         const products = await Product.find({
             vendorId: vendorId,
-            status: "Active", // ✅ ONLY ACTIVE PRODUCTS
+            status: "Active",
         }).sort({ createdAt: -1 });
 
         res.status(200).json({
@@ -619,6 +529,7 @@ exports.searchProducts = async (req, res) => {
         if (subcategoryId) filter.subcategoryId = subcategoryId;
         if (subsubcategoryId) filter.subsubcategoryId = subsubcategoryId;
 
+
         if (vendorId) filter.vendorId = vendorId;
 
         if (status) {
@@ -646,5 +557,75 @@ exports.searchProducts = async (req, res) => {
             success: false,
             message: "Failed to search products"
         });
+    }
+};
+
+
+
+// Produnct update 
+exports.toggleFeatureProduct = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const product = await Product.findById(id);
+        if (!product) {
+            return res.status(404).json({ success: false, message: "Product not found" });
+        }
+
+        product.fetureProduct = !product.fetureProduct; // ✅ match schema
+        await product.save();
+
+        return res.status(200).json({
+            success: true,
+            message: `Feature status toggled to ${product.fetureProduct}`,
+            data: product,
+        });
+    } catch (err) {
+        console.log("toggleFeatureProduct error:", err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+
+exports.getFeaturedProducts = async (req, res) => {
+    try {
+        const products = await Product.find({ featureProduct: true }).sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            total: products.length,
+            data: products,
+        });
+    } catch (err) {
+        console.log("getFeaturedProducts error:", err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+
+exports.uploadProductFile = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const product = await Product.findById(id);
+        if (!product) {
+            return res.status(404).json({ success: false, message: "Product not found" });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: "No file uploaded" });
+        }
+
+        product.productFile = req.file.path;
+        await product.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Product file uploaded successfully",
+            data: product,
+        });
+    } catch (err) {
+        console.log("uploadProductFile error:", err);
+        return res.status(500).json({ success: false, message: err.message });
     }
 };

@@ -18,14 +18,14 @@ mongoose
     .catch((err) => console.log("Database Not connected !!!", err));
 
 
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static("uploads"));
 
 
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 app.use(cors());
 app.use(morgan("dev"));
-app.use(express.static("public"));
+// app.use(express.static("public"));
 app.use(express.urlencoded({ extended: true }));
 
 const adminRoute = require("./Route/Admin");
@@ -68,9 +68,7 @@ const PORT = process.env.PORT || 8000;
 require("./corn/unlockProduct");
 
 app.get("/test", (req, res) => {
-
     res.status(200).json({ message: "Welcome to Suman Back end" });
-
 });
 
 app.listen(PORT, () => {

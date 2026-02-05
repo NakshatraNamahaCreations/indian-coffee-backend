@@ -63,6 +63,12 @@ const productSchema = new mongoose.Schema(
             type: Date,
             default: null
         },
+        fetureProduct: {
+            type: Boolean,
+            default: false
+        },
+        productFile: { type: String, default: "" },
+
         status: { type: String, enum: ["Active", "Inactive"], default: "Inactive" },
     },
     { timestamps: true }
