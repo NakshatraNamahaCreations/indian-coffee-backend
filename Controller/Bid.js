@@ -77,156 +77,280 @@ const { default: mongoose } = require("mongoose");
 // };
 
 
+// exports.createBid = async (req, res) => {
+//     const session = await mongoose.startSession();
+
+//     try {
+//         session.startTransaction();
+
+//         const {
+//             userId,
+//             userName,
+//             productId,
+//             bidPricePerBag,
+//             quantityBags,
+//             advanceAmount,
+//             messageToSeller,
+//             bidType,
+//         } = req.body;
+
+//         if (!userId || !userName || !productId) {
+//             return res.status(400).json({ success: false, error: "userId, userName, productId are required" });
+//         }
+
+//         if (!mongoose.Types.ObjectId.isValid(productId)) {
+//             return res.status(400).json({ success: false, error: "Invalid productId" });
+//         }
+
+//         const price = Number(bidPricePerBag);
+//         const qty = Number(quantityBags);
+//         const adv = Number(advanceAmount);
+
+//         if (!Number.isFinite(price) || price <= 0) {
+//             return res.status(400).json({ success: false, error: "bidPricePerBag must be > 0" });
+//         }
+//         if (!Number.isFinite(qty) || qty <= 0) {
+//             return res.status(400).json({ success: false, error: "quantityBags must be > 0" });
+//         }
+//         if (!Number.isFinite(adv) || adv < 0) {
+//             return res.status(400).json({ success: false, error: "advanceAmount must be >= 0" });
+//         }
+
+//         const safeBidType = ["NORMAL", "LOCK"].includes(String(bidType)) ? String(bidType) : "NORMAL";
+
+//         const product = await Product.findOne({ _id: productId }).session(session);
+//         if (!product) {
+//             return res.status(404).json({ success: false, error: "Product not found" });
+//         }
+
+//         if (String(product.status) !== "Active") {
+//             return res.status(403).json({ success: false, error: "Product is not Active" });
+//         }
+
+
+//         const existingBid = await Bid.findOne({
+//             userId,
+//             productId,
+//             status: { $nin: ["rejected", "inactive"] },
+//         }).session(session);
+
+//         if (existingBid) {
+//             return res.status(400).json({ success: false, error: "Already bid placed on this product" });
+//         }
+
+
+//         if (safeBidType === "LOCK") {
+
+//             const updated = await Product.findOneAndUpdate(
+//                 { _id: productId, availableQuantity: { $gte: qty }, isLocked: false },
+//                 { $inc: { availableQuantity: -qty } },
+//                 { new: true, session }
+//             );
+
+//             if (!updated) {
+//                 return res.status(400).json({
+//                     success: false,
+//                     error: "Not enough available quantity to lock this bid",
+//                 });
+//             }
+//         } else {
+
+//             if (Number(product.availableQuantity || 0) < qty) {
+//                 return res.status(400).json({
+//                     success: false,
+//                     error: "Not enough available quantity",
+//                 });
+//             }
+//         }
+
+//         const totalAmount = price * qty;
+//         const dueAmount = totalAmount - adv;
+
+//         if (dueAmount < 0) {
+//             return res.status(400).json({ success: false, error: "Advance amount cannot exceed total amount" });
+//         }
+
+//         const bid = await Bid.create(
+//             [
+//                 {
+//                     userId,
+//                     userName,
+//                     productId,
+//                     productSnapshot: product.toObject(),
+//                     bidPricePerBag: price,
+//                     quantityBags: qty,
+//                     advanceAmount: adv,
+//                     totalAmount,
+//                     dueAmount,
+//                     messageToSeller: messageToSeller || "",
+//                     bidType: safeBidType,
+//                     status: "pending",
+//                 },
+//             ],
+//             { session }
+//         );
+
+//         const vendorId = product.vendorId;
+
+//         if (vendorId) {
+//             const vendor = await Farmer.findById(vendorId).session(session);
+
+//             if (vendor?.fcmToken) {
+//                 await sendPushNotification(
+//                     vendor.fcmToken,
+//                     "📢 New Bid Received",
+//                     `New bid on ${product.productTitle || "your product"}`
+//                 );
+//             }
+//         }
+
+//         await session.commitTransaction();
+//         session.endSession();
+
+//         return res.status(201).json({ success: true, bid: bid?.[0] });
+//     } catch (err) {
+//         try {
+//             await session.abortTransaction();
+//             session.endSession();
+//         } catch (e) { }
+
+//         console.log("createBid error:", err);
+//         return res.status(500).json({ success: false, error: err.message || "Server error" });
+//     }
+// };
+
+
 exports.createBid = async (req, res) => {
     const session = await mongoose.startSession();
 
     try {
-        session.startTransaction();
+        await session.withTransaction(async () => {
+            const {
+                userId,
+                userName,
+                productId,
+                bidPricePerBag,
+                quantityBags,
+                advanceAmount,
+                messageToSeller,
+                bidType,
+            } = req.body;
 
-        const {
-            userId,
-            userName,
-            productId,
-            bidPricePerBag,
-            quantityBags,
-            advanceAmount,
-            messageToSeller,
-            bidType, // "NORMAL" | "LOCK"
-        } = req.body;
+            if (!userId || !userName || !productId) {
+                throw { status: 400, message: "userId, userName, productId are required" };
+            }
 
-        // ✅ basic validation
-        if (!userId || !userName || !productId) {
-            return res.status(400).json({ success: false, error: "userId, userName, productId are required" });
-        }
+            if (!mongoose.Types.ObjectId.isValid(productId)) {
+                throw { status: 400, message: "Invalid productId" };
+            }
 
-        if (!mongoose.Types.ObjectId.isValid(productId)) {
-            return res.status(400).json({ success: false, error: "Invalid productId" });
-        }
+            const price = Number(bidPricePerBag);
+            const qty = Number(quantityBags);
+            const adv = Number(advanceAmount);
 
-        const price = Number(bidPricePerBag);
-        const qty = Number(quantityBags);
-        const adv = Number(advanceAmount);
+            if (!Number.isFinite(price) || price <= 0) {
+                throw { status: 400, message: "bidPricePerBag must be > 0" };
+            }
+            if (!Number.isFinite(qty) || qty <= 0) {
+                throw { status: 400, message: "quantityBags must be > 0" };
+            }
+            if (!Number.isFinite(adv) || adv < 0) {
+                throw { status: 400, message: "advanceAmount must be >= 0" };
+            }
 
-        if (!Number.isFinite(price) || price <= 0) {
-            return res.status(400).json({ success: false, error: "bidPricePerBag must be > 0" });
-        }
-        if (!Number.isFinite(qty) || qty <= 0) {
-            return res.status(400).json({ success: false, error: "quantityBags must be > 0" });
-        }
-        if (!Number.isFinite(adv) || adv < 0) {
-            return res.status(400).json({ success: false, error: "advanceAmount must be >= 0" });
-        }
+            const safeBidType = ["NORMAL", "LOCK"].includes(String(bidType)) ? String(bidType) : "NORMAL";
 
-        const safeBidType = ["NORMAL", "LOCK"].includes(String(bidType)) ? String(bidType) : "NORMAL";
+            // 1) Fetch product
+            const product = await Product.findById(productId).session(session);
+            if (!product) {
+                throw { status: 404, message: "Product not found" };
+            }
 
-        // ✅ Only allow bid if product exists + active
-        const product = await Product.findOne({ _id: productId }).session(session);
-        if (!product) {
-            return res.status(404).json({ success: false, error: "Product not found" });
-        }
+            if (String(product.status) !== "Active") {
+                throw { status: 403, message: "Product is not Active" };
+            }
 
-        // ✅ optional: allow bid only on Active product
-        if (String(product.status) !== "Active") {
-            return res.status(403).json({ success: false, error: "Product is not Active" });
-        }
+            // 2) Validate advance <= total
+            const totalAmount = price * qty;
+            const dueAmount = totalAmount - adv;
 
-        // ✅ prevent multiple active bids for same user & product
-        const existingBid = await Bid.findOne({
-            userId,
-            productId,
-            status: { $nin: ["rejected", "inactive"] }, // active bids
-        }).session(session);
+            if (dueAmount < 0) {
+                throw { status: 400, message: "Advance amount cannot exceed total amount" };
+            }
 
-        if (existingBid) {
-            return res.status(400).json({ success: false, error: "Already bid placed on this product" });
-        }
+            // 3) ✅ Reserve stock for EVERY bid (NORMAL + LOCK) using atomic update
+            // If you still need LOCK-only rules like isLocked false, keep that condition only for LOCK.
+            const reserveQuery = {
+                _id: productId,
+                availableQuantity: { $gte: qty },
+            };
 
-        // ✅ STOCK RULE:
-        // NORMAL = no reserve
-        // LOCK = reserve stock immediately (decrease availableQuantity)
-        if (safeBidType === "LOCK") {
-            // atomic reserve: only decrease if enough stock
-            const updated = await Product.findOneAndUpdate(
-                { _id: productId, availableQuantity: { $gte: qty }, isLocked: false },
+            if (safeBidType === "LOCK") {
+                reserveQuery.isLocked = false; // keep your lock rule if needed
+            }
+
+            const updatedProduct = await Product.findOneAndUpdate(
+                reserveQuery,
                 { $inc: { availableQuantity: -qty } },
                 { new: true, session }
             );
 
-            if (!updated) {
-                return res.status(400).json({
-                    success: false,
-                    error: "Not enough available quantity to lock this bid",
-                });
+            if (!updatedProduct) {
+                throw { status: 400, message: "Not enough available quantity" };
             }
-        } else {
-            // if NORMAL but still want to block when insufficient stock:
-            if (Number(product.availableQuantity || 0) < qty) {
-                return res.status(400).json({
-                    success: false,
-                    error: "Not enough available quantity",
-                });
+
+            // 4) ✅ Allow multiple bids for same user (NO blocking with existingBid)
+            const bidDoc = {
+                userId,
+                userName,
+                productId,
+                productSnapshot: product.toObject(),
+                bidPricePerBag: price,
+                quantityBags: qty,
+                advanceAmount: adv,
+                totalAmount,
+                dueAmount,
+                messageToSeller: messageToSeller || "",
+                bidType: safeBidType,
+                status: "pending",
+            };
+
+            const bid = await Bid.create([bidDoc], { session });
+
+            // 5) Notify vendor
+            const vendorId = product.vendorId;
+            if (vendorId) {
+                const vendor = await Farmer.findById(vendorId).session(session);
+                if (vendor?.fcmToken) {
+                    await sendPushNotification(
+                        vendor.fcmToken,
+                        "📢 New Bid Received",
+                        `New bid on ${product.productTitle || "your product"}`
+                    );
+                }
             }
-        }
 
-        // ✅ amounts
-        const totalAmount = price * qty;
-        const dueAmount = totalAmount - adv;
+            // store result for response outside transaction
+            res.locals.createdBid = bid?.[0];
+        });
 
-        if (dueAmount < 0) {
-            return res.status(400).json({ success: false, error: "Advance amount cannot exceed total amount" });
-        }
-
-        // ✅ create bid
-        const bid = await Bid.create(
-            [
-                {
-                    userId,
-                    userName,
-                    productId,
-                    productSnapshot: product.toObject(),
-                    bidPricePerBag: price,
-                    quantityBags: qty,
-                    advanceAmount: adv,
-                    totalAmount,
-                    dueAmount,
-                    messageToSeller: messageToSeller || "",
-                    bidType: safeBidType,
-                    status: "pending",
-                },
-            ],
-            { session }
-        );
-
-        // ✅ push notification to vendor
-        const vendorId = product.vendorId;
-
-        if (vendorId) {
-            // (your product vendor is Farmer as per your code)
-            const vendor = await Farmer.findById(vendorId).session(session);
-
-            if (vendor?.fcmToken) {
-                await sendPushNotification(
-                    vendor.fcmToken,
-                    "📢 New Bid Received",
-                    `New bid on ${product.productTitle || "your product"}`
-                );
-            }
-        }
-
-        await session.commitTransaction();
-        session.endSession();
-
-        return res.status(201).json({ success: true, bid: bid?.[0] });
+        return res.status(201).json({
+            success: true,
+            bid: res.locals.createdBid,
+        });
     } catch (err) {
-        try {
-            await session.abortTransaction();
-            session.endSession();
-        } catch (e) { }
+        const status = err?.status || 500;
+        const message = err?.message || err?.error || err?.toString() || "Server error";
 
         console.log("createBid error:", err);
-        return res.status(500).json({ success: false, error: err.message || "Server error" });
+        return res.status(status).json({ success: false, error: message });
+    } finally {
+        try {
+            session.endSession();
+        } catch (e) { }
     }
 };
+
 
 
 exports.lockAfterPayment = async (req, res) => {
@@ -425,9 +549,7 @@ exports.adminApproveBid = async (req, res) => {
             { new: true }
         );
 
-        if (!product) {
-            return res.status(400).json({ error: "Insufficient available quantity" });
-        }
+
 
         bid.status = "admin_approved";
         await bid.save();
