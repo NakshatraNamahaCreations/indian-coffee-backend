@@ -587,9 +587,28 @@ exports.toggleFeatureProduct = async (req, res) => {
 };
 
 
+// exports.getFeaturedProducts = async (req, res) => {
+//     try {
+//         const products = await Product.find({ featureProduct: true }).sort({ createdAt: -1 });
+
+//         return res.status(200).json({
+//             success: true,
+//             total: products.length,
+//             data: products,
+//         });
+//     } catch (err) {
+//         console.log("getFeaturedProducts error:", err);
+//         return res.status(500).json({ success: false, message: err.message });
+//     }
+// };
+
+
 exports.getFeaturedProducts = async (req, res) => {
     try {
-        const products = await Product.find({ featureProduct: true }).sort({ createdAt: -1 });
+        const products = await Product.find({
+            fetureProduct: true,
+            status: "Active",
+        }).sort({ createdAt: -1 });
 
         return res.status(200).json({
             success: true,
@@ -598,7 +617,10 @@ exports.getFeaturedProducts = async (req, res) => {
         });
     } catch (err) {
         console.log("getFeaturedProducts error:", err);
-        return res.status(500).json({ success: false, message: err.message });
+        return res.status(500).json({
+            success: false,
+            message: err.message || "Server Error",
+        });
     }
 };
 
