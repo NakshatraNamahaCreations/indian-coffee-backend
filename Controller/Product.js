@@ -188,45 +188,6 @@ exports.getAllProducts = async (req, res) => {
 };
 
 
-// exports.updateProduct = async (req, res) => {
-//     try {
-//         const updateData = req.body;
-
-//         if (req.file) {
-//             updateData.productImage = req.file.path.replace(/\\/g, "/");
-//         }
-
-//         const product = await Product.findByIdAndUpdate(
-//             req.params.id,
-//             updateData,
-//             { new: true }
-//         );
-
-//         res.status(200).json({ success: true, data: product });
-
-//     } catch (err) {
-//         res.status(500).json({ success: false, message: err.message });
-//     }
-// };
-
-// exports.updateProduct = async (req, res) => {
-//     try {
-//         const updateData = { ...req.body };
-
-//         const newImages =
-//             (req.files || []).map((f) => String(f.path).replace(/\\/g, "/"));
-
-//         // ✅ replace only if uploaded
-//         if (newImages.length > 0) {
-//             updateData.productImages = newImages;
-//         }
-
-//         const updated = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true });
-//         return res.status(200).json({ success: true, data: updated });
-//     } catch (err) {
-//         return res.status(500).json({ success: false, message: err.message });
-//     }
-// };
 
 
 exports.updateProduct = async (req, res) => {
@@ -245,7 +206,6 @@ exports.updateProduct = async (req, res) => {
 
         const newImages = (req.files || []).map((f) => String(f.path).replace(/\\/g, "/"));
 
-        // ✅ final list = existing (after remove) + new uploads
         updateData.productImages = [...existingImages, ...newImages];
 
         const updated = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true });
@@ -562,7 +522,6 @@ exports.searchProducts = async (req, res) => {
 
 
 
-// Produnct update 
 exports.toggleFeatureProduct = async (req, res) => {
     try {
         const { id } = req.params;
@@ -585,23 +544,6 @@ exports.toggleFeatureProduct = async (req, res) => {
         return res.status(500).json({ success: false, message: err.message });
     }
 };
-
-
-// exports.getFeaturedProducts = async (req, res) => {
-//     try {
-//         const products = await Product.find({ featureProduct: true }).sort({ createdAt: -1 });
-
-//         return res.status(200).json({
-//             success: true,
-//             total: products.length,
-//             data: products,
-//         });
-//     } catch (err) {
-//         console.log("getFeaturedProducts error:", err);
-//         return res.status(500).json({ success: false, message: err.message });
-//     }
-// };
-
 
 exports.getFeaturedProducts = async (req, res) => {
     try {
