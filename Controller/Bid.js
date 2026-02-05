@@ -669,7 +669,7 @@ exports.adminrejectBid = async (req, res) => {
         }
 
         // ✅ Prevent double reject / double rollback
-        if (["rejected", "inactive"].includes(bid.status)) {
+        if (["rejected", "inactive"].includes(String(bid.status))) {
             return res.status(400).json({
                 success: false,
                 error: `Bid already ${bid.status}`,
@@ -687,32 +687,18 @@ exports.adminrejectBid = async (req, res) => {
         bid.status = "rejected";
         await bid.save({ session });
 
-        // ✅ Restore availableQuantity ONLY if this bid reserved stock
-        // Best rule: reserve is based on bidType === "LOCK"
-        const shouldRollbackQty = String(bid.bidType || "").toUpperCase() === "LOCK";
-
-        // ✅ Optional unlock fields
+        // ✅ ALWAYS restore availableQuantity
+        // because your createBid now reserves stock for NORMAL and LOCK
         const unlockFields = { isLocked: false, lockedBy: null, lockExpiresAt: null };
 
-        let product = null;
-
-        if (shouldRollbackQty) {
-            product = await Product.findByIdAndUpdate(
-                bid.productId,
-                {
-                    $inc: { availableQuantity: bidQty },
-                    ...unlockFields,
-                },
-                { new: true, session }
-            );
-        } else {
-            // If NORMAL bid didn't reserve qty, do NOT increase availableQuantity
-            product = await Product.findByIdAndUpdate(
-                bid.productId,
-                unlockFields,
-                { new: true, session }
-            );
-        }
+        const product = await Product.findByIdAndUpdate(
+            bid.productId,
+            {
+                $inc: { availableQuantity: bidQty },
+                ...unlockFields,
+            },
+            { new: true, session }
+        );
 
         await session.commitTransaction();
         session.endSession();
@@ -748,7 +734,7 @@ exports.adminrejectBid = async (req, res) => {
             success: true,
             message: "Bid rejected successfully",
             prevStatus,
-            rollbackQty: shouldRollbackQty ? bidQty : 0,
+            rollbackQty: bidQty,
             bid,
             product,
         });
@@ -762,6 +748,7 @@ exports.adminrejectBid = async (req, res) => {
         return res.status(500).json({ success: false, error: error.message || "Server Error" });
     }
 };
+
 
 exports.getBidsByUser = async (req, res) => {
     try {

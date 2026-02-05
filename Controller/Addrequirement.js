@@ -8,9 +8,7 @@ const WeightUnit = require("../Modal/Weightunit");
 
 exports.createProduct = async (req, res) => {
   try {
-    console.log("🔥 HIT /createrequirement");
-    console.log("➡️ Body:", req.body);
-    console.log("➡️ File:", req.file);
+
 
     const {
       productTitle,
@@ -113,6 +111,74 @@ exports.createProduct = async (req, res) => {
 };
 
 
+// exports.placeOrUpdateOffer = async (req, res) => {
+//   try {
+//     const requirementId = String(req.params.requirementId || "").trim();
+//     const { farmerId, offeredQuantity, offeredPricePerUnit, note } = req.body;
+
+//     if (!mongoose.Types.ObjectId.isValid(requirementId)) {
+//       return res.status(400).json({ success: false, message: "Invalid requirementId" });
+//     }
+//     if (!mongoose.Types.ObjectId.isValid(farmerId)) {
+//       return res.status(400).json({ success: false, message: "Invalid farmerId" });
+//     }
+
+//     const qtyNum = Number(offeredQuantity || 0);
+//     const priceNum = Number(offeredPricePerUnit || 0);
+
+//     if (qtyNum <= 0) {
+//       return res.status(400).json({ success: false, message: "offeredQuantity must be > 0" });
+//     }
+//     if (priceNum <= 0) {
+//       return res.status(400).json({ success: false, message: "offeredPricePerUnit must be > 0" });
+//     }
+
+//     const reqDoc = await Requirement.findById(requirementId);
+//     if (!reqDoc) {
+//       return res.status(404).json({ success: false, message: "Requirement not found" });
+//     }
+
+//     if (reqDoc.status !== "Active") {
+//       return res.status(400).json({ success: false, message: "Requirement is not active" });
+//     }
+
+//     const existsIdx = (reqDoc.vendorData || []).findIndex(
+//       (v) => String(v.vendorId) === String(farmerId) && v.refre === "farmer"
+//     );
+
+//     if (existsIdx >= 0) {
+//       reqDoc.vendorData[existsIdx].offeredQuantity = qtyNum;
+//       reqDoc.vendorData[existsIdx].offeredPricePerUnit = priceNum;
+//       reqDoc.vendorData[existsIdx].note = String(note || "");
+//       reqDoc.vendorData[existsIdx].vendorStatus = "pending";
+//       reqDoc.vendorData[existsIdx].updatedAt = new Date();
+//     } else {
+//       reqDoc.vendorData.push({
+//         vendorId: farmerId,
+//         refre: "farmer",
+//         offeredQuantity: qtyNum,
+//         offeredPricePerUnit: priceNum,
+//         note: String(note || ""),
+//         vendorStatus: "pending",
+//         createdAt: new Date(),
+//         updatedAt: new Date(),
+//       });
+//     }
+
+//     await reqDoc.save();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: existsIdx >= 0 ? "Offer updated" : "Offer placed",
+//       data: reqDoc,
+//     });
+//   } catch (err) {
+//     console.error("placeOrUpdateOffer error:", err);
+//     return res.status(500).json({ success: false, message: "Server error" });
+//   }
+// };
+
+
 exports.placeOrUpdateOffer = async (req, res) => {
   try {
     const requirementId = String(req.params.requirementId || "").trim();
@@ -144,16 +210,28 @@ exports.placeOrUpdateOffer = async (req, res) => {
       return res.status(400).json({ success: false, message: "Requirement is not active" });
     }
 
-    const existsIdx = (reqDoc.vendorData || []).findIndex(
+    reqDoc.vendorData = reqDoc.vendorData || [];
+
+    const idx = reqDoc.vendorData.findIndex(
       (v) => String(v.vendorId) === String(farmerId) && v.refre === "farmer"
     );
 
-    if (existsIdx >= 0) {
-      reqDoc.vendorData[existsIdx].offeredQuantity = qtyNum;
-      reqDoc.vendorData[existsIdx].offeredPricePerUnit = priceNum;
-      reqDoc.vendorData[existsIdx].note = String(note || "");
-      reqDoc.vendorData[existsIdx].vendorStatus = "pending";
-      reqDoc.vendorData[existsIdx].updatedAt = new Date();
+    let action = "created";
+
+    if (idx >= 0) {
+      action = "updated";
+
+      // ✅ prevent editing after accepted (optional but recommended)
+      if (reqDoc.vendorData[idx].vendorStatus === "accepted") {
+        return res.status(400).json({ success: false, message: "Cannot update after admin accepted" });
+      }
+
+      reqDoc.vendorData[idx].offeredQuantity = qtyNum;
+      reqDoc.vendorData[idx].offeredPricePerUnit = priceNum;
+      reqDoc.vendorData[idx].note = String(note || "");
+      reqDoc.vendorData[idx].vendorStatus = "pending";
+      reqDoc.vendorData[idx].rejectionMessage = "";
+      reqDoc.vendorData[idx].updatedAt = new Date();
     } else {
       reqDoc.vendorData.push({
         vendorId: farmerId,
@@ -162,20 +240,29 @@ exports.placeOrUpdateOffer = async (req, res) => {
         offeredPricePerUnit: priceNum,
         note: String(note || ""),
         vendorStatus: "pending",
+        rejectionMessage: "",
+        inventoryAdded: false,
         createdAt: new Date(),
         updatedAt: new Date(),
+        acceptedAt: null,
       });
     }
 
     await reqDoc.save();
 
+    const vendor = reqDoc.vendorData.find(
+      (v) => String(v.vendorId) === String(farmerId) && v.refre === "farmer"
+    );
+
     return res.status(200).json({
       success: true,
-      message: existsIdx >= 0 ? "Offer updated" : "Offer placed",
+      message: action === "updated" ? "Offer updated" : "Offer placed",
+      action,
+      vendor,
       data: reqDoc,
     });
   } catch (err) {
-    console.error("placeOrUpdateOffer error:", err);
+    console.error("❌ placeOrUpdateOffer error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -245,7 +332,7 @@ exports.farmerAcceptProduct = async (req, res) => {
     requirement.vendorData.push({
       vendorId: farmerId,
       refre: "farmer",
-      vendorStatus: vendorStatus || "accepted", // ✅ status passed separately
+      vendorStatus: vendorStatus || "accepted",
     });
 
     requirement.approvalStatus = "farmer_accepted";
@@ -318,6 +405,7 @@ exports.listForFarmerApp = async (req, res) => {
     });
   }
 };
+
 
 exports.getallrequirement = async (req, res) => {
   try {
@@ -398,5 +486,204 @@ exports.updateApproval = async (req, res) => {
     return res.json({ success: true, data: updated });
   } catch (err) {
     return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+
+exports.rejectRequirement = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const reason = String(req.body?.reason || "").trim();
+
+    const requirement = await Requirement.findById(id);
+    if (!requirement) {
+      return res.status(404).json({ success: false, message: "Requirement not found" });
+    }
+
+    // ✅ prevent reject after final approval (optional)
+    if (requirement.approvalStatus === "final_admin_approved") {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot reject after final admin approval",
+      });
+    }
+
+    // ✅ DO NOT TOUCH inventory here
+    requirement.approvalStatus = "rejected";
+    requirement.status = "Inactive";
+
+    // optional: store reason if you add field in schema
+    if (reason) requirement.rejectionReason = reason;
+
+    await requirement.save();
+
+    return res.status(200).json({
+      success: true,
+      message: reason
+        ? `Requirement rejected: ${reason}`
+        : "Requirement rejected successfully",
+      data: requirement,
+    });
+  } catch (err) {
+    console.error("❌ rejectRequirement error:", err);
+    return res.status(500).json({ success: false, message: "Server error while rejecting" });
+  }
+};
+
+exports.withdrawOfferByFarmer = async (req, res) => {
+  try {
+    const requirementId = String(req.params.requirementId || "").trim();
+    const farmerId = String(req.params.farmerId || "").trim();
+
+    if (!mongoose.Types.ObjectId.isValid(requirementId)) {
+      return res.status(400).json({ success: false, message: "Invalid requirementId" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(farmerId)) {
+      return res.status(400).json({ success: false, message: "Invalid farmerId" });
+    }
+
+    const reqDoc = await Requirement.findById(requirementId);
+    if (!reqDoc) {
+      return res.status(404).json({ success: false, message: "Requirement not found" });
+    }
+
+    const idx = (reqDoc.vendorData || []).findIndex(
+      (v) => String(v.vendorId) === String(farmerId) && v.refre === "farmer"
+    );
+
+    if (idx < 0) {
+      return res.status(404).json({ success: false, message: "Offer not found for this farmer" });
+    }
+
+    // ✅ block withdraw after accepted (optional but recommended)
+    if (reqDoc.vendorData[idx].vendorStatus === "accepted") {
+      return res.status(400).json({ success: false, message: "Cannot withdraw after admin accepted" });
+    }
+
+    const removed = reqDoc.vendorData[idx];
+    reqDoc.vendorData.splice(idx, 1);
+
+    await reqDoc.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Offer withdrawn and removed successfully",
+      removedVendor: removed,
+      data: reqDoc,
+    });
+  } catch (err) {
+    console.error("❌ withdrawOfferByFarmer error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+
+exports.adminAcceptRejectOffer = async (req, res) => {
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    const requirementId = String(req.params.requirementId || "").trim();
+    const vendorId = String(req.params.vendorId || "").trim();
+
+    const action = String(req.body.action || "").trim(); // accepted | rejected
+    const rejectionMessage = String(req.body.rejectionMessage || "").trim();
+
+    if (!mongoose.Types.ObjectId.isValid(requirementId)) {
+      return res.status(400).json({ success: false, message: "Invalid requirementId" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+      return res.status(400).json({ success: false, message: "Invalid vendorId" });
+    }
+
+    if (!["accepted", "rejected"].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid action. Use accepted or rejected",
+      });
+    }
+
+    const reqDoc = await Requirement.findById(requirementId).session(session);
+    if (!reqDoc) {
+      return res.status(404).json({ success: false, message: "Requirement not found" });
+    }
+
+    reqDoc.vendorData = reqDoc.vendorData || [];
+
+    const idx = reqDoc.vendorData.findIndex(
+      (v) => String(v.vendorId) === String(vendorId) && v.refre === "farmer"
+    );
+
+    if (idx < 0) {
+      return res.status(404).json({ success: false, message: "Vendor offer not found" });
+    }
+
+    const vendor = reqDoc.vendorData[idx];
+
+    // ✅ accept/reject only when pending (recommended)
+    if (vendor.vendorStatus !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot ${action}. Current vendorStatus: ${vendor.vendorStatus}`,
+      });
+    }
+
+    if (action === "accepted") {
+      vendor.vendorStatus = "accepted";
+      vendor.acceptedAt = new Date();
+      vendor.updatedAt = new Date();
+      vendor.rejectionMessage = "";
+
+      // ✅ INVENTORY ADDED = requirement.quantity (only once)
+      if (!vendor.inventoryAdded) {
+        const addQty = Number(reqDoc.quantity || 0);
+
+        if (!Number.isFinite(addQty) || addQty <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid requirement quantity for inventory add",
+          });
+        }
+
+        reqDoc.inventory = Number(reqDoc.inventory || 0) + addQty;
+        reqDoc.availableQuantity = Number(reqDoc.availableQuantity || 0) + addQty;
+
+        vendor.inventoryAdded = true;
+      }
+
+      await reqDoc.save({ session });
+      await session.commitTransaction();
+
+      return res.status(200).json({
+        success: true,
+        message: "Admin accepted offer. Inventory added from requirement quantity.",
+        vendor,
+        data: reqDoc,
+      });
+    }
+
+    // ✅ REJECT
+    vendor.vendorStatus = "rejected";
+    vendor.updatedAt = new Date();
+    vendor.acceptedAt = null;
+    vendor.inventoryAdded = false; // keep false
+    vendor.rejectionMessage = rejectionMessage || "Rejected by admin";
+
+    await reqDoc.save({ session });
+    await session.commitTransaction();
+
+    return res.status(200).json({
+      success: true,
+      message: vendor.rejectionMessage,
+      vendor,
+      data: reqDoc,
+    });
+  } catch (err) {
+    await session.abortTransaction();
+    console.error("❌ adminAcceptRejectOffer error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  } finally {
+    session.endSession();
   }
 };

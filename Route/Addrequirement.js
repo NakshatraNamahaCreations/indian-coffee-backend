@@ -7,13 +7,11 @@ const fs = require("fs");
 
 const RequirementController = require("../Controller/Addrequirement");
 
-/* ================= UPLOAD DIR ================= */
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "products");
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-/* ================= MULTER STORAGE ================= */
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, UPLOAD_DIR);
@@ -29,7 +27,6 @@ const storage = multer.diskStorage({
   },
 });
 
-/* ================= FILE FILTER ================= */
 const fileFilter = (req, file, cb) => {
   const allowed = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
   if (!allowed.includes(file.mimetype)) {
@@ -38,7 +35,6 @@ const fileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
-/* ================= MULTER INSTANCE ================= */
 const uploadProductImage = multer({
   storage,
   fileFilter,
@@ -47,9 +43,6 @@ const uploadProductImage = multer({
   },
 });
 
-/* ================= ROUTES ================= */
-
-// CREATE REQUIREMENT WITH IMAGE
 router.post(
   "/createrequirement",
   (req, res, next) => {
@@ -85,5 +78,19 @@ router.patch(
 router.get("/listby/:userId", RequirementController.listByUser);
 router.put("/:id/approval", RequirementController.updateApproval);
 router.post("/requirement/:requirementId/offer", RequirementController.placeOrUpdateOffer);
+router.put("/requirement/:id/reject", RequirementController.rejectRequirement);
+
+router.post("/requirements/:requirementId/offer", RequirementController.placeOrUpdateOffer);
+
+router.delete(
+  "/requirements/:requirementId/offers/:farmerId/withdraw",
+  RequirementController.withdrawOfferByFarmer
+);
+
+router.put(
+  "/requirements/:requirementId/offers/:vendorId/admin-action",
+  RequirementController.adminAcceptRejectOffer
+);
+
 
 module.exports = router;

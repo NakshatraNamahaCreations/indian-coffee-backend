@@ -13,6 +13,10 @@ const vendorDataSchema = new mongoose.Schema(
     offeredQuantity: { type: Number, default: 0 },
     offeredPricePerUnit: { type: Number, default: 0 },
     note: { type: String, default: "" },
+    inventoryAdded: { type: Boolean, default: false },
+
+    // ✅ NEW: store reject msg (optional)
+    rejectionMessage: { type: String, default: "" },
 
     vendorStatus: {
       type: String,
@@ -60,6 +64,7 @@ const requirementSchema = new mongoose.Schema(
       enum: ["pending_admin", "admin_approved", "farmer_accepted", "final_admin_approved", "rejected"],
       default: "pending_admin",
     },
+    rejectionReason: { type: String, default: "" },
 
     status: { type: String, enum: ["Active", "Inactive"], default: "Active" },
   },
