@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const Otp = require("../Modal/Otp");
 const sendOtpSms = require("../utils/sendOtpSms");
 const sendPushNotification = require("../utils/sendPushNotification");
+const InAppNotification = require("../Modal/Notification");
 
 
 exports.register = async (req, res) => {
@@ -324,6 +325,78 @@ exports.delete = async (req, res) => {
     }
 };
 
+// exports.updateStatus = async (req, res) => {
+//     try {
+//         const { id } = req.params;
+
+//         const farmer = await Farmer.findById(id);
+//         if (!farmer) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Farmer not found",
+//             });
+//         }
+
+//         farmer.status = farmer.status === "Active" ? "Inactive" : "Active";
+//         await farmer.save();
+
+//         try {
+//             if (farmer.fcmToken) {
+//                 const title =
+//                     farmer.status === "Active"
+//                         ? "Account Approved ✅"
+//                         : "Account Deactivated ❌";
+
+//                 const body =
+//                     farmer.status === "Active"
+//                         ? "Admin approved your account. You can start using the app."
+//                         : "Your account has been deactivated by admin. Please contact support.";
+
+//                 await sendPushNotification(
+//                     farmer.fcmToken,
+//                     title,
+//                     body
+//                 );
+//             }
+//         } catch (pushErr) {
+//             console.error("Push notification failed:", pushErr.message);
+//         }
+
+//             try {
+//             await InAppNotification.create({
+//                 userId: String(trader._id), // schema type is String
+//                 notificationType: "TRADER_STATUS_TOGGLED",
+//                 thumbnailTitle: "Trader status updated",
+//                 notifyTo: "admin",
+//                 message: `Trader ${trader.name || ""} status changed to ${trader.status}.`,
+//                 metaData: {
+//                     traderId: String(trader._id),
+//                     status: trader.status,
+//                 },
+//                 status: "unread",
+//             });
+//         } catch (notiErr) {
+//             console.error("In-app notification save failed:", notiErr.message);
+//         }
+
+//         const responseData = farmer.toObject();
+//         delete responseData.password;
+//         console.log("responseData", responseData)
+
+//         return res.json({
+//             success: true,
+//             message: `Farmer status updated to ${farmer.status}`,
+//             data: responseData,
+//         });
+//     } catch (err) {
+//         console.error("Toggle Status Error:", err);
+//         return res.status(500).json({
+//             success: false,
+//             message: "Failed to update status",
+//         });
+//     }
+// };
+
 exports.updateStatus = async (req, res) => {
     try {
         const { id } = req.params;
@@ -351,19 +424,33 @@ exports.updateStatus = async (req, res) => {
                         ? "Admin approved your account. You can start using the app."
                         : "Your account has been deactivated by admin. Please contact support.";
 
-                await sendPushNotification(
-                    farmer.fcmToken,
-                    title,
-                    body
-                );
+                await sendPushNotification(farmer.fcmToken, title, body);
             }
         } catch (pushErr) {
             console.error("Push notification failed:", pushErr.message);
         }
 
+        try {
+            await InAppNotification.create({
+                userId: String(farmer._id),
+                notificationType: "FARMER_STATUS_TOGGLED",
+                thumbnailTitle: "Farmer status updated",
+                notifyTo: "admin",
+                message: `Farmer ${farmer.name || ""} status changed to ${farmer.status}.`,
+                metaData: {
+                    farmerId: String(farmer._id),
+                    status: farmer.status,
+                },
+                status: "unread",
+            });
+        } catch (notiErr) {
+            console.error("In-app notification save failed:", notiErr.message);
+        }
+
+
+
         const responseData = farmer.toObject();
         delete responseData.password;
-        console.log("responseData", responseData)
 
         return res.json({
             success: true,
