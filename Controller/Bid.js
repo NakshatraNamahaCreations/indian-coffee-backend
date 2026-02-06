@@ -8,6 +8,7 @@ const { default: mongoose } = require("mongoose");
 const InAppNotification = require("../Modal/Notification")
 
 
+const safeId = (v) => (v ? String(v) : "");
 
 // exports.createBid = async (req, res) => {
 //     try {
@@ -703,10 +704,8 @@ exports.vendorAcceptBid = async (req, res) => {
             return res.status(404).json({ success: false, error: "Bid not found" });
         }
 
-        // ✅ Find product to get vendorId (optional, but helpful in metaData)
         const product = await Product.findById(bid.productId).select("vendorId").lean();
 
-        // ✅ Push to Trader
         try {
             if (bid.userId) {
                 const trader = await Trader.findById(bid.userId).lean();
@@ -722,7 +721,6 @@ exports.vendorAcceptBid = async (req, res) => {
             console.log("vendorAcceptBid push error:", pushErr?.message || pushErr);
         }
 
-        // ✅ In-App Notification to TRADER (use notifyTo="customer" since enum doesn't have "trader")
         try {
             await InAppNotification.create({
                 userId: safeId(bid.userId),
@@ -869,7 +867,6 @@ exports.adminApproveBid = async (req, res) => {
         bid.status = "admin_approved";
         await bid.save();
 
-        // ✅ Push notifications
         try {
             if (bid.userId) {
                 const trader = await Trader.findById(bid.userId).lean();
@@ -896,9 +893,7 @@ exports.adminApproveBid = async (req, res) => {
             console.log("adminApproveBid push error:", pushErr?.message || pushErr);
         }
 
-        // ✅ In-app notifications
         try {
-            // Trader
             if (bid.userId) {
                 await InAppNotification.create({
                     userId: safeId(bid.userId),
@@ -980,11 +975,9 @@ exports.adminrejectBid = async (req, res) => {
             return res.status(400).json({ success: false, error: "Invalid bid quantity" });
         }
 
-        // ✅ Mark rejected
         bid.status = "rejected";
         await bid.save({ session });
 
-        // ✅ Restore quantity + unlock product
         const product = await Product.findByIdAndUpdate(
             bid.productId,
             {
@@ -997,7 +990,6 @@ exports.adminrejectBid = async (req, res) => {
         await session.commitTransaction();
         session.endSession();
 
-        // ✅ Push notifications (outside transaction)
         try {
             if (bid.userId) {
                 const trader = await Trader.findById(bid.userId).lean();
@@ -1024,9 +1016,7 @@ exports.adminrejectBid = async (req, res) => {
             console.log("adminrejectBid push error:", notifyErr?.message || notifyErr);
         }
 
-        // ✅ In-app notifications (Trader + Vendor)
         try {
-            // Trader
             if (bid.userId) {
                 await InAppNotification.create({
                     userId: safeId(bid.userId),
@@ -1046,7 +1036,6 @@ exports.adminrejectBid = async (req, res) => {
                 });
             }
 
-            // Vendor/Farmer
             if (product?.vendorId) {
                 await InAppNotification.create({
                     userId: safeId(product.vendorId),
