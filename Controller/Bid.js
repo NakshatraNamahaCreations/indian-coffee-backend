@@ -750,6 +750,89 @@ exports.vendorAcceptBid = async (req, res) => {
     }
 };
 
+
+// Vendor Reject Bid (set status + push to trader + in-app notification)
+exports.vendorRejectBid = async (req, res) => {
+    try {
+        const bidId = String(req.params.id || "").trim();
+
+        if (!mongoose.Types.ObjectId.isValid(bidId)) {
+            return res.status(400).json({ success: false, error: "Invalid Bid ID" });
+        }
+
+        // ✅ optional: prevent double reject
+        const bid = await Bid.findById(bidId);
+        if (!bid) {
+            return res.status(404).json({ success: false, error: "Bid not found" });
+        }
+
+        if (["vendor_rejected"].includes(String(bid.status))) {
+            return res.status(400).json({
+                success: false,
+                error: `Bid already ${bid.status}`,
+            });
+        }
+
+        // ✅ update status
+        bid.status = "vendor_rejected";
+        await bid.save();
+
+        // ✅ get vendorId from product (for metadata)
+        let product = null;
+        try {
+            product = await Product.findById(bid.productId).select("vendorId").lean();
+        } catch (e) {
+            product = null;
+        }
+
+        // ✅ Push to trader (optional)
+        try {
+            if (bid.userId) {
+                const trader = await Trader.findById(bid.userId).lean();
+                if (trader?.fcmToken) {
+                    await sendPushNotificationTrader(
+                        trader.fcmToken,
+                        "❌ Bid Rejected by Vendor",
+                        "Vendor rejected your bid. You can place a new bid or try again."
+                    );
+                }
+            }
+        } catch (pushErr) {
+            console.log("vendorRejectBid push error:", pushErr?.message || pushErr);
+        }
+
+        // ✅ In-App notification to trader/customer
+        try {
+            await InAppNotification.create({
+                userId: safeId(bid.userId), // traderId
+                notificationType: "BID_VENDOR_REJECTED",
+                thumbnailTitle: "Bid rejected by Vendor",
+                notifyTo: "customer", // same as your accept flow
+                message:
+                    "Your bid has been rejected by the vendor. You can place a new bid.",
+                metaData: {
+                    bidId: safeId(bid._id),
+                    productId: safeId(bid.productId),
+                    vendorId: safeId(product?.vendorId),
+                    traderId: safeId(bid.userId),
+                    status: "vendor_rejected",
+                    quantityBags: Number(bid.quantityBags || 0),
+                    pricePerUnit: Number(bid.pricePerUnit || 0),
+                },
+                status: "unread",
+            });
+        } catch (notiErr) {
+            console.log("vendorRejectBid in-app error:", notiErr?.message || notiErr);
+        }
+
+        return res.json({ success: true, bid });
+    } catch (error) {
+        console.error("vendorRejectBid error:", error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+
 exports.adminApproveBid = async (req, res) => {
     try {
         const bidId = String(req.params.id || "").trim();

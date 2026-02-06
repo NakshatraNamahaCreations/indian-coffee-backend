@@ -32,11 +32,12 @@ const bidSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: [
-        "pending",          
-        "vendor_accepted",  
-        "admin_approved",  
+        "pending",
+        "vendor_accepted",
+        "admin_approved",
         "rejected",
         "inactive",
+        "vendor_rejected"
       ],
       default: "pending",
     },
