@@ -449,248 +449,12 @@ exports.getAllBids = async (req, res) => {
 };
 
 
-// exports.vendorAcceptBid = async (req, res) => {
-//     try {
-//         const bidId = req.params.id?.trim();
-
-//         if (!mongoose.Types.ObjectId.isValid(bidId)) {
-//             return res.status(400).json({ error: "Invalid Bid ID" });
-//         }
-
-//         const bid = await Bid.findByIdAndUpdate(
-//             bidId,
-//             { status: "vendor_accepted" },
-//             { new: true }
-//         );
-
-//         if (!bid) {
-//             return res.status(404).json({ error: "Bid not found" });
-//         }
-
-//         const traderId = bid.userId;
-
-//         if (traderId) {
-//             const trader = await Trader.findById(traderId);
-
-//             console.log("trader", trader)
-
-//             if (trader?.fcmToken) {
-//                 await sendPushNotificationTrader(
-//                     trader.fcmToken,
-//                     "✅ Bid Accepted by Vendor",
-//                     "Vendor approved your bid. Waiting for admin approval.",
-//                 );
-//             }
-//         }
-
-//         res.json({ success: true, bid });
-
-//     } catch (error) {
-//         console.error("vendorAcceptBid error:", error);
-//         res.status(500).json({ error: error.message });
-//     }
-// };
-
-// exports.adminApproveBid = async (req, res) => {
-//     try {
-//         const bidId = req.params.id?.trim();
-
-//         if (!mongoose.Types.ObjectId.isValid(bidId)) {
-//             return res.status(400).json({ error: "Invalid Bid ID" });
-//         }
-
-//         const bid = await Bid.findById(bidId);
-//         console.log("bid", bid)
-//         if (!bid) return res.status(404).json({ error: "Bid not found" });
-
-//         if (bid.status === "admin_approved") {
-//             const product = await Product.findByIdAndUpdate(
-//                 bid.productId,
-//                 { isLocked: false, lockedBy: null, lockExpiresAt: null },
-//                 { new: true }
-//             );
-
-//             if (bid.userId) {
-//                 const trader = await Trader.findById(bid.userId);
-//                 if (trader?.fcmToken) {
-//                     await sendPushNotificationTrader(
-//                         trader.fcmToken,
-//                         "🎉 Bid Approved by Admin",
-//                         "Your bid has been approved by admin. Please proceed with next steps."
-//                     );
-//                 }
-//             }
-
-//             if (product?.vendorId) {
-//                 const farmer = await Farmer.findById(product.vendorId);
-//                 if (farmer?.fcmToken) {
-//                     await sendPushNotification(
-//                         farmer.fcmToken,
-//                         "✅ Bid Approved by Admin",
-//                         "Admin approved the bid. You can proceed with the order."
-//                     );
-//                 }
-//             }
-
-//             return res.json({ success: true, bid, product });
-//         }
-
-//         const bidQty = Number(bid.quantityBags);
-//         console.log("bidQty", bidQty)
-//         if (!Number.isFinite(bidQty) || bidQty <= 0) {
-//             return res.status(400).json({ error: "Invalid bid quantity" });
-//         }
-
-//         const product = await Product.findOneAndUpdate(
-//             { _id: bid.productId, availableQuantity: { $gte: bidQty } },
-//             {
-//                 $inc: { availableQuantity: -bidQty },
-//                 $set: { isLocked: false, lockedBy: null, lockExpiresAt: null },
-//             },
-//             { new: true }
-//         );
-
-
-
-//         bid.status = "admin_approved";
-//         await bid.save();
-
-//         if (bid.userId) {
-//             const trader = await Trader.findById(bid.userId);
-//             if (trader?.fcmToken) {
-//                 await sendPushNotificationTrader(
-//                     trader.fcmToken,
-//                     "🎉 Bid Approved by Admin",
-//                     "Your bid has been approved by admin. Please proceed with next steps."
-//                 );
-//             }
-//         }
-
-//         if (product?.vendorId) {
-//             const farmer = await Farmer.findById(product.vendorId);
-//             if (farmer?.fcmToken) {
-//                 await sendPushNotification(
-//                     farmer.fcmToken,
-//                     "✅ Bid Approved by Admin",
-//                     "Admin approved the bid. You can proceed with the order."
-//                 );
-//             }
-//         }
-
-
-//         return res.json({ success: true, bid, product });
-//     } catch (error) {
-//         console.error("adminApproveBid error:", error);
-//         return res.status(500).json({ error: error.message });
-//     }
-// };
-
-// exports.adminrejectBid = async (req, res) => {
-//     const session = await mongoose.startSession();
-
-//     try {
-//         session.startTransaction();
-
-//         const bidId = String(req.params.id || "").trim();
-
-//         if (!mongoose.Types.ObjectId.isValid(bidId)) {
-//             return res.status(400).json({ success: false, error: "Invalid Bid ID" });
-//         }
-
-//         const bid = await Bid.findById(bidId).session(session);
-//         if (!bid) {
-//             return res.status(404).json({ success: false, error: "Bid not found" });
-//         }
-
-//         // ✅ Prevent double reject / double rollback
-//         if (["rejected", "inactive"].includes(String(bid.status))) {
-//             return res.status(400).json({
-//                 success: false,
-//                 error: `Bid already ${bid.status}`,
-//             });
-//         }
-
-//         const prevStatus = bid.status;
-
-//         const bidQty = Number(bid.quantityBags);
-//         if (!Number.isFinite(bidQty) || bidQty <= 0) {
-//             return res.status(400).json({ success: false, error: "Invalid bid quantity" });
-//         }
-
-//         // ✅ Mark rejected
-//         bid.status = "rejected";
-//         await bid.save({ session });
-
-//         // ✅ ALWAYS restore availableQuantity
-//         // because your createBid now reserves stock for NORMAL and LOCK
-//         const unlockFields = { isLocked: false, lockedBy: null, lockExpiresAt: null };
-
-//         const product = await Product.findByIdAndUpdate(
-//             bid.productId,
-//             {
-//                 $inc: { availableQuantity: bidQty },
-//                 ...unlockFields,
-//             },
-//             { new: true, session }
-//         );
-
-//         await session.commitTransaction();
-//         session.endSession();
-
-//         // ✅ Notifications (outside transaction is okay)
-//         try {
-//             if (bid.userId) {
-//                 const trader = await Trader.findById(bid.userId);
-//                 if (trader?.fcmToken) {
-//                     await sendPushNotificationTrader(
-//                         trader.fcmToken,
-//                         "❌ Bid Rejected by Admin",
-//                         "Your bid has been rejected by admin."
-//                     );
-//                 }
-//             }
-
-//             if (product?.vendorId) {
-//                 const farmer = await Farmer.findById(product.vendorId);
-//                 if (farmer?.fcmToken) {
-//                     await sendPushNotification(
-//                         farmer.fcmToken,
-//                         "❌ Bid Rejected by Admin",
-//                         "Admin rejected the bid."
-//                     );
-//                 }
-//             }
-//         } catch (notifyErr) {
-//             console.log("adminrejectBid notification error:", notifyErr);
-//         }
-
-
-//         return res.json({
-//             success: true,
-//             message: "Bid rejected successfully",
-//             prevStatus,
-//             rollbackQty: bidQty,
-//             bid,
-//             product,
-//         });
-//     } catch (error) {
-//         try {
-//             await session.abortTransaction();
-//             session.endSession();
-//         } catch (e) { }
-
-//         console.error("adminrejectBid error:", error);
-//         return res.status(500).json({ success: false, error: error.message || "Server Error" });
-//     }
-// };
-
-
 exports.vendorAcceptBid = async (req, res) => {
     try {
-        const bidId = String(req.params.id || "").trim();
+        const bidId = req.params.id?.trim();
 
         if (!mongoose.Types.ObjectId.isValid(bidId)) {
-            return res.status(400).json({ success: false, error: "Invalid Bid ID" });
+            return res.status(400).json({ error: "Invalid Bid ID" });
         }
 
         const bid = await Bid.findByIdAndUpdate(
@@ -700,154 +464,81 @@ exports.vendorAcceptBid = async (req, res) => {
         );
 
         if (!bid) {
-            return res.status(404).json({ success: false, error: "Bid not found" });
+            return res.status(404).json({ error: "Bid not found" });
         }
 
-        // ✅ Find product to get vendorId (optional, but helpful in metaData)
-        const product = await Product.findById(bid.productId).select("vendorId").lean();
+        const traderId = bid.userId;
 
-        // ✅ Push to Trader
-        try {
-            if (bid.userId) {
-                const trader = await Trader.findById(bid.userId).lean();
-                if (trader?.fcmToken) {
-                    await sendPushNotificationTrader(
-                        trader.fcmToken,
-                        "✅ Bid Accepted by Vendor",
-                        "Vendor accepted your bid. Waiting for admin approval."
-                    );
-                }
+        if (traderId) {
+            const trader = await Trader.findById(traderId);
+
+            console.log("trader", trader)
+
+            if (trader?.fcmToken) {
+                await sendPushNotificationTrader(
+                    trader.fcmToken,
+                    "✅ Bid Accepted by Vendor",
+                    "Vendor approved your bid. Waiting for admin approval.",
+                );
             }
-        } catch (pushErr) {
-            console.log("vendorAcceptBid push error:", pushErr?.message || pushErr);
         }
 
-        // ✅ In-App Notification to TRADER (use notifyTo="customer" since enum doesn't have "trader")
-        try {
-            await InAppNotification.create({
-                userId: safeId(bid.userId),
-                notificationType: "BID_VENDOR_ACCEPTED",
-                thumbnailTitle: "Bid accepted by Vendor",
-                notifyTo: "customer",
-                message: "Your bid has been accepted by the vendor. Waiting for admin approval.",
-                metaData: {
-                    bidId: safeId(bid._id),
-                    productId: safeId(bid.productId),
-                    vendorId: safeId(product?.vendorId),
-                    traderId: safeId(bid.userId),
-                    status: "vendor_accepted",
-                    quantityBags: Number(bid.quantityBags || 0),
-                    pricePerUnit: Number(bid.pricePerUnit || 0),
-                },
-                status: "unread",
-            });
-        } catch (notiErr) {
-            console.log("vendorAcceptBid in-app error:", notiErr?.message || notiErr);
-        }
+        res.json({ success: true, bid });
 
-        return res.json({ success: true, bid });
     } catch (error) {
         console.error("vendorAcceptBid error:", error);
-        return res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ error: error.message });
     }
 };
 
 exports.adminApproveBid = async (req, res) => {
     try {
-        const bidId = String(req.params.id || "").trim();
+        const bidId = req.params.id?.trim();
 
         if (!mongoose.Types.ObjectId.isValid(bidId)) {
-            return res.status(400).json({ success: false, error: "Invalid Bid ID" });
+            return res.status(400).json({ error: "Invalid Bid ID" });
         }
 
         const bid = await Bid.findById(bidId);
-        if (!bid) return res.status(404).json({ success: false, error: "Bid not found" });
+        console.log("bid", bid)
+        if (!bid) return res.status(404).json({ error: "Bid not found" });
 
-        // ✅ If already approved, just unlock product + re-send notifications (idempotent)
-        if (String(bid.status) === "admin_approved") {
+        if (bid.status === "admin_approved") {
             const product = await Product.findByIdAndUpdate(
                 bid.productId,
                 { isLocked: false, lockedBy: null, lockExpiresAt: null },
                 { new: true }
             );
 
-            // Push
-            try {
-                if (bid.userId) {
-                    const trader = await Trader.findById(bid.userId).lean();
-                    if (trader?.fcmToken) {
-                        await sendPushNotificationTrader(
-                            trader.fcmToken,
-                            "🎉 Bid Approved by Admin",
-                            "Your bid has been approved by admin. Please proceed with next steps."
-                        );
-                    }
+            if (bid.userId) {
+                const trader = await Trader.findById(bid.userId);
+                if (trader?.fcmToken) {
+                    await sendPushNotificationTrader(
+                        trader.fcmToken,
+                        "🎉 Bid Approved by Admin",
+                        "Your bid has been approved by admin. Please proceed with next steps."
+                    );
                 }
-
-                if (product?.vendorId) {
-                    const farmer = await Farmer.findById(product.vendorId).lean();
-                    if (farmer?.fcmToken) {
-                        await sendPushNotification(
-                            farmer.fcmToken,
-                            "✅ Bid Approved by Admin",
-                            "Admin approved the bid. You can proceed with the order."
-                        );
-                    }
-                }
-            } catch (pushErr) {
-                console.log("adminApproveBid (already approved) push error:", pushErr?.message || pushErr);
             }
 
-            // In-app (Trader + Vendor)
-            try {
-                if (bid.userId) {
-                    await InAppNotification.create({
-                        userId: safeId(bid.userId),
-                        notificationType: "BID_ADMIN_APPROVED",
-                        thumbnailTitle: "Bid approved by Admin",
-                        notifyTo: "customer",
-                        message: "Admin approved your bid. Please proceed with next steps.",
-                        metaData: {
-                            bidId: safeId(bid._id),
-                            productId: safeId(bid.productId),
-                            vendorId: safeId(product?.vendorId),
-                            traderId: safeId(bid.userId),
-                            status: "admin_approved",
-                            quantityBags: Number(bid.quantityBags || 0),
-                        },
-                        status: "unread",
-                    });
+            if (product?.vendorId) {
+                const farmer = await Farmer.findById(product.vendorId);
+                if (farmer?.fcmToken) {
+                    await sendPushNotification(
+                        farmer.fcmToken,
+                        "✅ Bid Approved by Admin",
+                        "Admin approved the bid. You can proceed with the order."
+                    );
                 }
-
-                if (product?.vendorId) {
-                    await InAppNotification.create({
-                        userId: safeId(product.vendorId),
-                        notificationType: "BID_ADMIN_APPROVED",
-                        thumbnailTitle: "Bid approved",
-                        notifyTo: "vendor",
-                        message: "Admin approved the bid. You can proceed with the order.",
-                        metaData: {
-                            bidId: safeId(bid._id),
-                            productId: safeId(bid.productId),
-                            vendorId: safeId(product.vendorId),
-                            traderId: safeId(bid.userId),
-                            status: "admin_approved",
-                            quantityBags: Number(bid.quantityBags || 0),
-                        },
-                        status: "unread",
-                    });
-                }
-            } catch (notiErr) {
-                console.log("adminApproveBid (already approved) in-app error:", notiErr?.message || notiErr);
             }
 
             return res.json({ success: true, bid, product });
         }
 
-        // ✅ Normal approve flow: validate qty, decrement availableQuantity, unlock, set bid status
         const bidQty = Number(bid.quantityBags);
+        console.log("bidQty", bidQty)
         if (!Number.isFinite(bidQty) || bidQty <= 0) {
-            return res.status(400).json({ success: false, error: "Invalid bid quantity" });
+            return res.status(400).json({ error: "Invalid bid quantity" });
         }
 
         const product = await Product.findOneAndUpdate(
@@ -859,94 +550,42 @@ exports.adminApproveBid = async (req, res) => {
             { new: true }
         );
 
-        if (!product) {
-            return res.status(400).json({
-                success: false,
-                error: "Insufficient product quantity / product not found",
-            });
-        }
+
 
         bid.status = "admin_approved";
         await bid.save();
 
-        // ✅ Push notifications
-        try {
-            if (bid.userId) {
-                const trader = await Trader.findById(bid.userId).lean();
-                if (trader?.fcmToken) {
-                    await sendPushNotificationTrader(
-                        trader.fcmToken,
-                        "🎉 Bid Approved by Admin",
-                        "Your bid has been approved by admin. Please proceed with next steps."
-                    );
-                }
+        if (bid.userId) {
+            const trader = await Trader.findById(bid.userId);
+            if (trader?.fcmToken) {
+                await sendPushNotificationTrader(
+                    trader.fcmToken,
+                    "🎉 Bid Approved by Admin",
+                    "Your bid has been approved by admin. Please proceed with next steps."
+                );
             }
-
-            if (product?.vendorId) {
-                const farmer = await Farmer.findById(product.vendorId).lean();
-                if (farmer?.fcmToken) {
-                    await sendPushNotification(
-                        farmer.fcmToken,
-                        "✅ Bid Approved by Admin",
-                        "Admin approved the bid. You can proceed with the order."
-                    );
-                }
-            }
-        } catch (pushErr) {
-            console.log("adminApproveBid push error:", pushErr?.message || pushErr);
         }
 
-        // ✅ In-app notifications
-        try {
-            // Trader
-            if (bid.userId) {
-                await InAppNotification.create({
-                    userId: safeId(bid.userId),
-                    notificationType: "BID_ADMIN_APPROVED",
-                    thumbnailTitle: "Bid approved by Admin",
-                    notifyTo: "customer",
-                    message: "Admin approved your bid. Please proceed with next steps.",
-                    metaData: {
-                        bidId: safeId(bid._id),
-                        productId: safeId(bid.productId),
-                        vendorId: safeId(product?.vendorId),
-                        traderId: safeId(bid.userId),
-                        status: "admin_approved",
-                        quantityBags: Number(bid.quantityBags || 0),
-                    },
-                    status: "unread",
-                });
+        if (product?.vendorId) {
+            const farmer = await Farmer.findById(product.vendorId);
+            if (farmer?.fcmToken) {
+                await sendPushNotification(
+                    farmer.fcmToken,
+                    "✅ Bid Approved by Admin",
+                    "Admin approved the bid. You can proceed with the order."
+                );
             }
-
-            // Vendor/Farmer
-            if (product?.vendorId) {
-                await InAppNotification.create({
-                    userId: safeId(product.vendorId),
-                    notificationType: "BID_ADMIN_APPROVED",
-                    thumbnailTitle: "Bid approved",
-                    notifyTo: "vendor",
-                    message: "Admin approved the bid. You can proceed with the order.",
-                    metaData: {
-                        bidId: safeId(bid._id),
-                        productId: safeId(bid.productId),
-                        vendorId: safeId(product.vendorId),
-                        traderId: safeId(bid.userId),
-                        status: "admin_approved",
-                        quantityBags: Number(bid.quantityBags || 0),
-                    },
-                    status: "unread",
-                });
-            }
-        } catch (notiErr) {
-            console.log("adminApproveBid in-app error:", notiErr?.message || notiErr);
         }
+
 
         return res.json({ success: true, bid, product });
     } catch (error) {
         console.error("adminApproveBid error:", error);
-        return res.status(500).json({ success: false, error: error.message });
+        return res.status(500).json({ error: error.message });
     }
 };
+
+
 
 exports.adminrejectBid = async (req, res) => {
     const session = await mongoose.startSession();
@@ -965,7 +604,7 @@ exports.adminrejectBid = async (req, res) => {
             return res.status(404).json({ success: false, error: "Bid not found" });
         }
 
-        // ✅ Prevent double reject
+        // ✅ Prevent double reject / double rollback
         if (["rejected", "inactive"].includes(String(bid.status))) {
             return res.status(400).json({
                 success: false,
@@ -984,12 +623,15 @@ exports.adminrejectBid = async (req, res) => {
         bid.status = "rejected";
         await bid.save({ session });
 
-        // ✅ Restore quantity + unlock product
+        // ✅ ALWAYS restore availableQuantity
+        // because your createBid now reserves stock for NORMAL and LOCK
+        const unlockFields = { isLocked: false, lockedBy: null, lockExpiresAt: null };
+
         const product = await Product.findByIdAndUpdate(
             bid.productId,
             {
                 $inc: { availableQuantity: bidQty },
-                $set: { isLocked: false, lockedBy: null, lockExpiresAt: null },
+                ...unlockFields,
             },
             { new: true, session }
         );
@@ -997,10 +639,10 @@ exports.adminrejectBid = async (req, res) => {
         await session.commitTransaction();
         session.endSession();
 
-        // ✅ Push notifications (outside transaction)
+        // ✅ Notifications (outside transaction is okay)
         try {
             if (bid.userId) {
-                const trader = await Trader.findById(bid.userId).lean();
+                const trader = await Trader.findById(bid.userId);
                 if (trader?.fcmToken) {
                     await sendPushNotificationTrader(
                         trader.fcmToken,
@@ -1011,7 +653,7 @@ exports.adminrejectBid = async (req, res) => {
             }
 
             if (product?.vendorId) {
-                const farmer = await Farmer.findById(product.vendorId).lean();
+                const farmer = await Farmer.findById(product.vendorId);
                 if (farmer?.fcmToken) {
                     await sendPushNotification(
                         farmer.fcmToken,
@@ -1021,53 +663,9 @@ exports.adminrejectBid = async (req, res) => {
                 }
             }
         } catch (notifyErr) {
-            console.log("adminrejectBid push error:", notifyErr?.message || notifyErr);
+            console.log("adminrejectBid notification error:", notifyErr);
         }
 
-        // ✅ In-app notifications (Trader + Vendor)
-        try {
-            // Trader
-            if (bid.userId) {
-                await InAppNotification.create({
-                    userId: safeId(bid.userId),
-                    notificationType: "BID_ADMIN_REJECTED",
-                    thumbnailTitle: "Bid rejected by Admin",
-                    notifyTo: "customer",
-                    message: "Admin rejected your bid.",
-                    metaData: {
-                        bidId: safeId(bid._id),
-                        productId: safeId(bid.productId),
-                        vendorId: safeId(product?.vendorId),
-                        traderId: safeId(bid.userId),
-                        status: "rejected",
-                        quantityBags: Number(bid.quantityBags || 0),
-                    },
-                    status: "unread",
-                });
-            }
-
-            // Vendor/Farmer
-            if (product?.vendorId) {
-                await InAppNotification.create({
-                    userId: safeId(product.vendorId),
-                    notificationType: "BID_ADMIN_REJECTED",
-                    thumbnailTitle: "Bid rejected",
-                    notifyTo: "vendor",
-                    message: "Admin rejected the bid.",
-                    metaData: {
-                        bidId: safeId(bid._id),
-                        productId: safeId(bid.productId),
-                        vendorId: safeId(product.vendorId),
-                        traderId: safeId(bid.userId),
-                        status: "rejected",
-                        quantityBags: Number(bid.quantityBags || 0),
-                    },
-                    status: "unread",
-                });
-            }
-        } catch (notiErr) {
-            console.log("adminrejectBid in-app error:", notiErr?.message || notiErr);
-        }
 
         return res.json({
             success: true,
@@ -1084,12 +682,10 @@ exports.adminrejectBid = async (req, res) => {
         } catch (e) { }
 
         console.error("adminrejectBid error:", error);
-        return res.status(500).json({
-            success: false,
-            error: error.message || "Server Error",
-        });
+        return res.status(500).json({ success: false, error: error.message || "Server Error" });
     }
 };
+
 
 exports.getBidsByUser = async (req, res) => {
     try {
