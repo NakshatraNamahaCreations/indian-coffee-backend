@@ -3,7 +3,8 @@ const bcrypt = require('bcryptjs');
 const Trader = require("../Modal/Trader");
 const Otp = require("../Modal/Otp");
 const sendOtpSms = require("../utils/sendOtpSms");
-const sendPushNotification = require("../utilstrader/sendPushNotification")
+const sendPushNotification = require("../utilstrader/sendPushNotification");
+const InAppNotification = require("../Modal/Notification");
 
 const isValidIndian10Digit = (m = "") => /^[6-9]\d{9}$/.test(String(m).trim());
 
@@ -472,50 +473,120 @@ exports.delete = async (req, res) => {
 
 
 
+// exports.updateStatus = async (req, res) => {
+//     try {
+//         const { id } = req.params;
+
+//         const farmer = await Trader.findById(id);
+//         if (!farmer) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Farmer not found",
+//             });
+//         }
+
+//         farmer.status = farmer.status === "Active" ? "Inactive" : "Active";
+//         await farmer.save();
+
+//         try {
+//             if (farmer.fcmToken) {
+//                 const title =
+//                     farmer.status === "Active"
+//                         ? "Account Approved ✅"
+//                         : "Account Deactivated ❌";
+
+//                 const body =
+//                     farmer.status === "Active"
+//                         ? "Admin approved your account. You can start using the app."
+//                         : "Your account has been deactivated by admin. Please contact support.";
+
+//                 await sendPushNotification(
+//                     farmer.fcmToken,
+//                     title,
+//                     body
+//                 );
+//             }
+//         } catch (pushErr) {
+//             console.error("Push notification failed:", pushErr.message);
+//         }
+
+//         const responseData = farmer.toObject();
+//         delete responseData.password;
+//         console.log("responseData", responseData)
+
+//         return res.json({
+//             success: true,
+//             message: `Farmer status updated to ${farmer.status}`,
+//             data: responseData,
+//         });
+//     } catch (err) {
+//         console.error("Toggle Status Error:", err);
+//         return res.status(500).json({
+//             success: false,
+//             message: "Failed to update status",
+//         });
+//     }
+// };
+
 exports.updateStatus = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const farmer = await Trader.findById(id);
-        if (!farmer) {
+        const trader = await Trader.findById(id);
+        if (!trader) {
             return res.status(404).json({
                 success: false,
-                message: "Farmer not found",
+                message: "Trader not found",
             });
         }
 
-        farmer.status = farmer.status === "Active" ? "Inactive" : "Active";
-        await farmer.save();
+        // ✅ Toggle
+        trader.status = trader.status === "Active" ? "Inactive" : "Active";
+        await trader.save();
 
+        // ✅ Push notification (optional)
         try {
-            if (farmer.fcmToken) {
+            if (trader.fcmToken) {
                 const title =
-                    farmer.status === "Active"
+                    trader.status === "Active"
                         ? "Account Approved ✅"
                         : "Account Deactivated ❌";
 
                 const body =
-                    farmer.status === "Active"
+                    trader.status === "Active"
                         ? "Admin approved your account. You can start using the app."
                         : "Your account has been deactivated by admin. Please contact support.";
 
-                await sendPushNotification(
-                    farmer.fcmToken,
-                    title,
-                    body
-                );
+                await sendPushNotification(trader.fcmToken, title, body);
             }
         } catch (pushErr) {
             console.error("Push notification failed:", pushErr.message);
         }
 
-        const responseData = farmer.toObject();
+        // ✅ In-App Notification (ADMIN VIEW)
+        // This will show in Admin "All notifications" page (filter notifyTo=admin)
+        try {
+            await InAppNotification.create({
+                userId: String(trader._id), // schema type is String
+                notificationType: "TRADER_STATUS_TOGGLED",
+                thumbnailTitle: "Trader status updated",
+                notifyTo: "admin",
+                message: `Trader ${trader.name || ""} status changed to ${trader.status}.`,
+                metaData: {
+                    traderId: String(trader._id),
+                    status: trader.status,
+                },
+                status: "unread",
+            });
+        } catch (notiErr) {
+            console.error("In-app notification save failed:", notiErr.message);
+        }
+        const responseData = trader.toObject();
         delete responseData.password;
-        console.log("responseData", responseData)
 
         return res.json({
             success: true,
-            message: `Farmer status updated to ${farmer.status}`,
+            message: `Trader status updated to ${trader.status}`,
             data: responseData,
         });
     } catch (err) {

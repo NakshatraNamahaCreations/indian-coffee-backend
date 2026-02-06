@@ -578,6 +578,266 @@ exports.withdrawOfferByFarmer = async (req, res) => {
 };
 
 
+// exports.adminAcceptRejectOffer = async (req, res) => {
+//   const session = await mongoose.startSession();
+
+//   try {
+//     session.startTransaction();
+
+//     const requirementId = String(req.params.requirementId || "").trim();
+//     const vendorId = String(req.params.vendorId || "").trim();
+
+//     const action = String(req.body.action || "").trim();
+//     const rejectionMessage = String(req.body.rejectionMessage || "").trim();
+
+//     if (!mongoose.Types.ObjectId.isValid(requirementId)) {
+//       return res.status(400).json({ success: false, message: "Invalid requirementId" });
+//     }
+//     if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+//       return res.status(400).json({ success: false, message: "Invalid vendorId" });
+//     }
+
+//     if (!["accepted", "rejected"].includes(action)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid action. Use accepted or rejected",
+//       });
+//     }
+
+//     const reqDoc = await Requirement.findById(requirementId).session(session);
+//     if (!reqDoc) {
+//       return res.status(404).json({ success: false, message: "Requirement not found" });
+//     }
+
+//     reqDoc.vendorData = reqDoc.vendorData || [];
+
+//     const idx = reqDoc.vendorData.findIndex(
+//       (v) => String(v.vendorId) === String(vendorId) && v.refre === "farmer"
+//     );
+
+//     if (idx < 0) {
+//       return res.status(404).json({ success: false, message: "Vendor offer not found" });
+//     }
+
+//     const vendor = reqDoc.vendorData[idx];
+
+
+//     if (vendor.vendorStatus !== "pending") {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Cannot ${action}. Current vendorStatus: ${vendor.vendorStatus}`,
+//       });
+//     }
+
+//     if (action === "accepted") {
+//       vendor.vendorStatus = "accepted";
+//       vendor.acceptedAt = new Date();
+//       vendor.updatedAt = new Date();
+//       vendor.rejectionMessage = "";
+
+
+//       if (!vendor.inventoryAdded) {
+//         const addQty = Number(reqDoc.quantity || 0);
+
+//         if (!Number.isFinite(addQty) || addQty <= 0) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Invalid requirement quantity for inventory add",
+//           });
+//         }
+
+//         reqDoc.inventory = Number(reqDoc.inventory || 0) - addQty;
+//         reqDoc.availableQuantity = Number(reqDoc.availableQuantity || 0) - addQty;
+
+//         vendor.inventoryAdded = true;
+//       }
+
+//       await reqDoc.save({ session });
+//       await session.commitTransaction();
+
+//       return res.status(200).json({
+//         success: true,
+//         message: "Admin accepted offer. Inventory added from requirement quantity.",
+//         vendor,
+//         data: reqDoc,
+//       });
+//     }
+
+
+//     vendor.vendorStatus = "rejected";
+//     vendor.updatedAt = new Date();
+//     vendor.acceptedAt = null;
+//     vendor.inventoryAdded = false;
+//     vendor.rejectionMessage = rejectionMessage || "Rejected by admin";
+
+//     await reqDoc.save({ session });
+//     await session.commitTransaction();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: vendor.rejectionMessage,
+//       vendor,
+//       data: reqDoc,
+//     });
+//   } catch (err) {
+//     await session.abortTransaction();
+//     console.error("❌ adminAcceptRejectOffer error:", err);
+//     return res.status(500).json({ success: false, message: "Server error" });
+//   } finally {
+//     session.endSession();
+//   }
+// };
+
+
+// exports.adminAcceptRejectOffer = async (req, res) => {
+//   const session = await mongoose.startSession();
+
+//   try {
+//     session.startTransaction();
+
+//     const requirementId = String(req.params.requirementId || "").trim();
+//     const vendorId = String(req.params.vendorId || "").trim();
+
+//     const action = String(req.body.action || "").trim(); // accepted | rejected
+//     const rejectionMessage = String(req.body.rejectionMessage || "").trim();
+
+//     if (!mongoose.Types.ObjectId.isValid(requirementId)) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Invalid requirementId" });
+//     }
+//     if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+//       return res.status(400).json({ success: false, message: "Invalid vendorId" });
+//     }
+
+//     if (!["accepted", "rejected"].includes(action)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid action. Use accepted or rejected",
+//       });
+//     }
+
+//     const reqDoc = await Requirement.findById(requirementId).session(session);
+//     if (!reqDoc) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Requirement not found" });
+//     }
+
+//     reqDoc.vendorData = reqDoc.vendorData || [];
+
+//     const idx = reqDoc.vendorData.findIndex(
+//       (v) => String(v.vendorId) === String(vendorId) && v.refre === "farmer"
+//     );
+
+//     if (idx < 0) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Vendor offer not found" });
+//     }
+
+//     const vendor = reqDoc.vendorData[idx];
+
+//     // ✅ Only pending can be actioned
+//     if (vendor.vendorStatus !== "pending") {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Cannot ${action}. Current vendorStatus: ${vendor.vendorStatus}`,
+//       });
+//     }
+
+//     // ✅ Validate qty once (needed for accept flow)
+//     const addQty = Number(reqDoc.quantity || 0);
+//     if (!Number.isFinite(addQty) || addQty <= 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid requirement quantity",
+//       });
+//     }
+
+//     // ✅ ACCEPT
+//     if (action === "accepted") {
+//       vendor.vendorStatus = "accepted";
+//       vendor.acceptedAt = new Date();
+//       vendor.updatedAt = new Date();
+//       vendor.rejectionMessage = "";
+
+//       /**
+//        * ✅ YOUR CHANGE:
+//        * When farmer offer is accepted, you want to MINUS requirement qty
+//        * from inventory and availableQuantity (instead of adding).
+//        *
+//        * Also prevent going negative.
+//        */
+//       if (!vendor.inventoryAdded) {
+//         const currentInv = Number(reqDoc.inventory || 0);
+//         const currentAvail = Number(reqDoc.availableQuantity || 0);
+
+//         if (!Number.isFinite(currentInv) || currentInv < 0) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Invalid inventory value in requirement",
+//           });
+//         }
+
+//         if (!Number.isFinite(currentAvail) || currentAvail < 0) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Invalid availableQuantity value in requirement",
+//           });
+//         }
+
+//         if (currentInv < addQty || currentAvail < addQty) {
+//           return res.status(400).json({
+//             success: false,
+//             message: `Not enough inventory/availableQuantity to subtract. Need ${addQty}, have inventory=${currentInv}, available=${currentAvail}`,
+//           });
+//         }
+
+//         reqDoc.inventory = currentInv - addQty;
+//         reqDoc.availableQuantity = currentAvail - addQty;
+
+//         vendor.inventoryAdded = true; // keeping your flag name for idempotency
+//       }
+
+//       await reqDoc.save({ session });
+//       await session.commitTransaction();
+
+//       return res.status(200).json({
+//         success: true,
+//         message:
+//           "Admin accepted offer. Inventory and availableQuantity reduced by requirement quantity.",
+//         vendor,
+//         data: reqDoc,
+//       });
+//     }
+
+//     // ✅ REJECT
+//     vendor.vendorStatus = "rejected";
+//     vendor.updatedAt = new Date();
+//     vendor.acceptedAt = null;
+//     vendor.inventoryAdded = false;
+//     vendor.rejectionMessage = rejectionMessage || "Rejected by admin";
+
+//     await reqDoc.save({ session });
+//     await session.commitTransaction();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: vendor.rejectionMessage,
+//       vendor,
+//       data: reqDoc,
+//     });
+//   } catch (err) {
+//     await session.abortTransaction();
+//     console.error("❌ adminAcceptRejectOffer error:", err);
+//     return res.status(500).json({ success: false, message: "Server error" });
+//   } finally {
+//     session.endSession();
+//   }
+// };
+
+
 exports.adminAcceptRejectOffer = async (req, res) => {
   const session = await mongoose.startSession();
 
@@ -587,14 +847,18 @@ exports.adminAcceptRejectOffer = async (req, res) => {
     const requirementId = String(req.params.requirementId || "").trim();
     const vendorId = String(req.params.vendorId || "").trim();
 
-    const action = String(req.body.action || "").trim(); // accepted | rejected
+    const action = String(req.body.action || "").trim(); // "accepted" | "rejected"
     const rejectionMessage = String(req.body.rejectionMessage || "").trim();
 
     if (!mongoose.Types.ObjectId.isValid(requirementId)) {
-      return res.status(400).json({ success: false, message: "Invalid requirementId" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid requirementId" });
     }
     if (!mongoose.Types.ObjectId.isValid(vendorId)) {
-      return res.status(400).json({ success: false, message: "Invalid vendorId" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid vendorId" });
     }
 
     if (!["accepted", "rejected"].includes(action)) {
@@ -606,68 +870,129 @@ exports.adminAcceptRejectOffer = async (req, res) => {
 
     const reqDoc = await Requirement.findById(requirementId).session(session);
     if (!reqDoc) {
-      return res.status(404).json({ success: false, message: "Requirement not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Requirement not found" });
     }
 
-    reqDoc.vendorData = reqDoc.vendorData || [];
+    reqDoc.vendorData = Array.isArray(reqDoc.vendorData) ? reqDoc.vendorData : [];
 
     const idx = reqDoc.vendorData.findIndex(
       (v) => String(v.vendorId) === String(vendorId) && v.refre === "farmer"
     );
 
     if (idx < 0) {
-      return res.status(404).json({ success: false, message: "Vendor offer not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Vendor offer not found" });
     }
 
     const vendor = reqDoc.vendorData[idx];
 
-    // ✅ accept/reject only when pending (recommended)
-    if (vendor.vendorStatus !== "pending") {
+    // ✅ Base quantity = requirement quantity (50 in your example)
+    const totalQty = Number(reqDoc.quantity || 0);
+    if (!Number.isFinite(totalQty) || totalQty <= 0) {
       return res.status(400).json({
         success: false,
-        message: `Cannot ${action}. Current vendorStatus: ${vendor.vendorStatus}`,
+        message: "Invalid requirement quantity",
       });
     }
 
+    // ✅ Use vendor offeredQuantity (20 in your example)
+    const offeredQty = Number(vendor.offeredQuantity || 0);
+    if (!Number.isFinite(offeredQty) || offeredQty <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid vendor offeredQuantity",
+      });
+    }
+
+    if (offeredQty > totalQty) {
+      return res.status(400).json({
+        success: false,
+        message: `offeredQuantity (${offeredQty}) cannot be greater than requirement quantity (${totalQty})`,
+      });
+    }
+
+    // ✅ Your case: availableQuantity is 0 initially, but you want it to behave like "50"
+    // So if availableQuantity is missing/0, treat it as totalQty (50).
+    const currentAvailRaw = Number(reqDoc.availableQuantity || 0);
+    const baseAvailable = currentAvailRaw > 0 ? currentAvailRaw : totalQty;
+
+    // ---------------- ACCEPT ----------------
     if (action === "accepted") {
+      // allow accept when pending OR rejected (so accept again after reject works)
+      const st = String(vendor.vendorStatus || "pending");
+      if (!["pending", "rejected"].includes(st)) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot accept. Current vendorStatus: ${vendor.vendorStatus}`,
+        });
+      }
+
+      // ✅ Idempotent subtract: only subtract if not already applied
+      if (!vendor.inventoryAdded) {
+        if (baseAvailable < offeredQty) {
+          return res.status(400).json({
+            success: false,
+            message: `Not enough availableQuantity. Need ${offeredQty}, have ${baseAvailable}`,
+          });
+        }
+
+        // ✅ EXACT NEED: 50 - 20 = 30
+        reqDoc.availableQuantity = baseAvailable - offeredQty;
+
+        // ❌ As you asked now: DO NOT add/subtract inventory here
+        // reqDoc.inventory = ... (not touched)
+
+        vendor.inventoryAdded = true; // means offeredQty is already applied once
+      }
+
       vendor.vendorStatus = "accepted";
       vendor.acceptedAt = new Date();
       vendor.updatedAt = new Date();
       vendor.rejectionMessage = "";
-
-      // ✅ INVENTORY ADDED = requirement.quantity (only once)
-      if (!vendor.inventoryAdded) {
-        const addQty = Number(reqDoc.quantity || 0);
-
-        if (!Number.isFinite(addQty) || addQty <= 0) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid requirement quantity for inventory add",
-          });
-        }
-
-        reqDoc.inventory = Number(reqDoc.inventory || 0) + addQty;
-        reqDoc.availableQuantity = Number(reqDoc.availableQuantity || 0) + addQty;
-
-        vendor.inventoryAdded = true;
-      }
 
       await reqDoc.save({ session });
       await session.commitTransaction();
 
       return res.status(200).json({
         success: true,
-        message: "Admin accepted offer. Inventory added from requirement quantity.",
+        message: `Accepted. availableQuantity updated to ${reqDoc.availableQuantity} (base ${baseAvailable} - offered ${offeredQty}).`,
         vendor,
         data: reqDoc,
       });
     }
 
-    // ✅ REJECT
+    // ---------------- REJECT ----------------
+    // allow reject when pending OR accepted
+    const st = String(vendor.vendorStatus || "pending");
+    if (!["pending", "accepted"].includes(st)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot reject. Current vendorStatus: ${vendor.vendorStatus}`,
+      });
+    }
+
+    // ✅ If this vendor was accepted earlier and we subtracted offeredQty, then add it back on reject.
+    // If vendor was pending and rejected directly, inventoryAdded will be false => no add-back.
+    if (vendor.inventoryAdded === true) {
+      const nowAvailRaw = Number(reqDoc.availableQuantity || 0);
+      const nowAvailBase = nowAvailRaw > 0 ? nowAvailRaw : totalQty;
+
+      // add back but never exceed totalQty
+      const restored = Math.min(totalQty, nowAvailBase + offeredQty);
+      reqDoc.availableQuantity = restored;
+
+      vendor.inventoryAdded = false; // prevent double add-back
+
+      // ❌ As you asked: inventory should NOT be added back here
+      // reqDoc.inventory = ... (not touched)
+    }
+
     vendor.vendorStatus = "rejected";
     vendor.updatedAt = new Date();
     vendor.acceptedAt = null;
-    vendor.inventoryAdded = false; // keep false
     vendor.rejectionMessage = rejectionMessage || "Rejected by admin";
 
     await reqDoc.save({ session });
@@ -687,3 +1012,4 @@ exports.adminAcceptRejectOffer = async (req, res) => {
     session.endSession();
   }
 };
+
