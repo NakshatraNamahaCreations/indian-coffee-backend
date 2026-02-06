@@ -42,6 +42,14 @@ exports.register = async (req, res) => {
             });
         }
 
+        const existingmobileNumberUser = await Farmer.findOne({ mobileNumber });
+        if (existingmobileNumberUser) {
+            return res.status(400).json({
+                success: false,
+                message: "mobileNumber already exists",
+            });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
         const files = req.files || {};
 

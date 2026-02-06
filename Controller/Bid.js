@@ -724,7 +724,7 @@ exports.vendorAcceptBid = async (req, res) => {
         try {
             await InAppNotification.create({
                 userId: safeId(bid.userId),
-                notificationType: "BID_VENDOR_ACCEPTED",
+                notificationType: "BIDING",
                 thumbnailTitle: "Bid accepted by Vendor",
                 notifyTo: "customer",
                 message: "Your bid has been accepted by the vendor. Waiting for admin approval.",
@@ -805,7 +805,7 @@ exports.vendorRejectBid = async (req, res) => {
         try {
             await InAppNotification.create({
                 userId: safeId(bid.userId), // traderId
-                notificationType: "BID_VENDOR_REJECTED",
+                notificationType: "BIDING",
                 thumbnailTitle: "Bid rejected by Vendor",
                 notifyTo: "customer", // same as your accept flow
                 message:
@@ -884,7 +884,7 @@ exports.adminApproveBid = async (req, res) => {
                 if (bid.userId) {
                     await InAppNotification.create({
                         userId: safeId(bid.userId),
-                        notificationType: "BID_ADMIN_APPROVED",
+                        notificationType: "BIDING",
                         thumbnailTitle: "Bid approved by Admin",
                         notifyTo: "customer",
                         message: "Admin approved your bid. Please proceed with next steps.",
@@ -903,7 +903,7 @@ exports.adminApproveBid = async (req, res) => {
                 if (product?.vendorId) {
                     await InAppNotification.create({
                         userId: safeId(product.vendorId),
-                        notificationType: "BID_ADMIN_APPROVED",
+                        notificationType: "BIDING",
                         thumbnailTitle: "Bid approved",
                         notifyTo: "vendor",
                         message: "Admin approved the bid. You can proceed with the order.",
@@ -980,7 +980,7 @@ exports.adminApproveBid = async (req, res) => {
             if (bid.userId) {
                 await InAppNotification.create({
                     userId: safeId(bid.userId),
-                    notificationType: "BID_ADMIN_APPROVED",
+                    notificationType: "BIDING",
                     thumbnailTitle: "Bid approved by Admin",
                     notifyTo: "customer",
                     message: "Admin approved your bid. Please proceed with next steps.",
@@ -1000,7 +1000,7 @@ exports.adminApproveBid = async (req, res) => {
             if (product?.vendorId) {
                 await InAppNotification.create({
                     userId: safeId(product.vendorId),
-                    notificationType: "BID_ADMIN_APPROVED",
+                    notificationType: "BIDING",
                     thumbnailTitle: "Bid approved",
                     notifyTo: "vendor",
                     message: "Admin approved the bid. You can proceed with the order.",
