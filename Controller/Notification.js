@@ -50,4 +50,28 @@ exports.fetchuserIDnotification = async (req, res) => {
     }
 };
 
+exports.fetchmarknotification = async (req, res) => {
+    try {
+        const { notificationId } = req.params;
+
+        const updatedNotification = await InAppNotification.findOneAndUpdate(
+            { _id: notificationId },
+            { $set: { status: "read" } },
+            { new: true }
+        ).lean();
+
+        if (!updatedNotification) {
+            return res.status(404).json({ message: "Notification not found" });
+        }
+
+        res.status(200).json({
+            message: "Notification marked as read",
+            notification: updatedNotification,
+        });
+    } catch (error) {
+        console.error("Error marking notification as read:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+}
+
 
