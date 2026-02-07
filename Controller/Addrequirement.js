@@ -5,6 +5,10 @@ const Subcategory = require("../Modal/Subcategory");
 const Subsubcategory = require("../Modal/Subsubcategory");
 const WeightUnit = require("../Modal/Weightunit");
 const InAppNotification = require("../Modal/Notification");
+const Farmer = require("../Modal/Farmer");
+const Trader = require("../Modal/Trader")
+const sendPushNotification = require("../utils/sendPushNotification");
+const sendPushNotificationTrader = require("../utilstrader/sendPushNotification");
 
 
 exports.createProduct = async (req, res) => {
@@ -405,19 +409,111 @@ exports.listByUser = async (req, res) => {
   }
 };
 
+// exports.updateApproval = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { approvalStatus } = req.body;
+
+//     const updated = await Requirement.findByIdAndUpdate(
+//       id,
+//       { approvalStatus },
+//       { new: true }
+//     );
+
+//     return res.json({ success: true, data: updated });
+//   } catch (err) {
+//     return res.status(500).json({ success: false, message: "Server error" });
+//   }
+// };
+
 exports.updateApproval = async (req, res) => {
   try {
     const { id } = req.params;
     const { approvalStatus } = req.body;
 
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid requirement id" });
+    }
+
+    if (!approvalStatus) {
+      return res.status(400).json({ success: false, message: "approvalStatus is required" });
+    }
+
+    // ✅ Update approvalStatus
     const updated = await Requirement.findByIdAndUpdate(
       id,
       { approvalStatus },
       { new: true }
     );
 
+    if (!updated) {
+      return res.status(404).json({ success: false, message: "Requirement not found" });
+    }
+
+    const requirementTitle =
+      updated.productTitle || updated.title || updated.requirementTitle || "Product";
+
+    // ----------------------------------
+    // ✅ 1) TRADER notification (always)
+    // requirement.userId => Trader._id
+    // ----------------------------------
+    try {
+      const traderId = String(updated.userId || "");
+
+      if (mongoose.Types.ObjectId.isValid(traderId)) {
+        const traderDoc = await Trader.findById(traderId).select("_id name status");
+
+        if (traderDoc) {
+          await InAppNotification.create({
+            userId: String(traderDoc._id),
+            notificationType: "NEW_PRODUCT_AVAILABLE",
+            thumbnailTitle: "📌 Approval Status Updated",
+            notifyTo: "customer",
+            message: `Your product "${requirementTitle}" approval status changed to "${approvalStatus}".`,
+            metaData: {
+              requirementId: String(updated._id),
+              traderId: String(traderDoc._id),
+              approvalStatus,
+            },
+            status: "unread",
+          });
+        }
+      }
+    } catch (notiErr) {
+      console.error("Trader notification failed:", notiErr.message);
+    }
+
+    // ----------------------------------
+    // ✅ 2) If approved -> notify ALL farmers
+    // ----------------------------------
+    if (approvalStatus === "admin_approved") {
+      try {
+        const farmers = await Farmer.find({}).select("_id");
+
+        if (farmers?.length) {
+          const farmerNotis = farmers.map((f) => ({
+            userId: String(f._id),
+            notificationType: "NEW_PRODUCT_AVAILABLE",
+            thumbnailTitle: "🆕 New Product Available",
+            notifyTo: "vendor",
+            message: `New product "${requirementTitle}" is now available. Check it in the app.`,
+            metaData: {
+              requirementId: String(updated._id),
+              approvalStatus,
+            },
+            status: "unread",
+          }));
+
+          await InAppNotification.insertMany(farmerNotis, { ordered: false });
+        }
+      } catch (bulkErr) {
+        console.error("Farmer bulk notification failed:", bulkErr.message);
+      }
+    }
+
     return res.json({ success: true, data: updated });
   } catch (err) {
+    console.error("updateApproval error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -510,30 +606,27 @@ exports.withdrawOfferByFarmer = async (req, res) => {
   }
 };
 
-
 exports.adminAcceptRejectOffer = async (req, res) => {
   const session = await mongoose.startSession();
+
+  // ✅ No "who"/"type" field
+  const traderPushQueue = []; // [{ token, title, body, data }]
+  const farmerPushQueue = []; // [{ token, title, body, data }]
 
   try {
     session.startTransaction();
 
     const requirementId = String(req.params.requirementId || "").trim();
     const vendorId = String(req.params.vendorId || "").trim();
-
-    const action = String(req.body.action || "").trim(); // "accepted" | "rejected"
+    const action = String(req.body.action || "").trim(); // accepted | rejected
     const rejectionMessage = String(req.body.rejectionMessage || "").trim();
 
     if (!mongoose.Types.ObjectId.isValid(requirementId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid requirementId" });
+      return res.status(400).json({ success: false, message: "Invalid requirementId" });
     }
     if (!mongoose.Types.ObjectId.isValid(vendorId)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid vendorId" });
+      return res.status(400).json({ success: false, message: "Invalid vendorId" });
     }
-
     if (!["accepted", "rejected"].includes(action)) {
       return res.status(400).json({
         success: false,
@@ -543,9 +636,7 @@ exports.adminAcceptRejectOffer = async (req, res) => {
 
     const reqDoc = await Requirement.findById(requirementId).session(session);
     if (!reqDoc) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Requirement not found" });
+      return res.status(404).json({ success: false, message: "Requirement not found" });
     }
 
     reqDoc.vendorData = Array.isArray(reqDoc.vendorData) ? reqDoc.vendorData : [];
@@ -553,31 +644,20 @@ exports.adminAcceptRejectOffer = async (req, res) => {
     const idx = reqDoc.vendorData.findIndex(
       (v) => String(v.vendorId) === String(vendorId) && v.refre === "farmer"
     );
-
     if (idx < 0) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Vendor offer not found" });
+      return res.status(404).json({ success: false, message: "Vendor offer not found" });
     }
 
     const vendor = reqDoc.vendorData[idx];
 
-    // ✅ Base quantity = requirement quantity (50 in your example)
     const totalQty = Number(reqDoc.quantity || 0);
     if (!Number.isFinite(totalQty) || totalQty <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid requirement quantity",
-      });
+      return res.status(400).json({ success: false, message: "Invalid requirement quantity" });
     }
 
-    // ✅ Use vendor offeredQuantity (20 in your example)
     const offeredQty = Number(vendor.offeredQuantity || 0);
     if (!Number.isFinite(offeredQty) || offeredQty <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid vendor offeredQuantity",
-      });
+      return res.status(400).json({ success: false, message: "Invalid vendor offeredQuantity" });
     }
 
     if (offeredQty > totalQty) {
@@ -587,14 +667,36 @@ exports.adminAcceptRejectOffer = async (req, res) => {
       });
     }
 
-    // ✅ Your case: availableQuantity is 0 initially, but you want it to behave like "50"
-    // So if availableQuantity is missing/0, treat it as totalQty (50).
     const currentAvailRaw = Number(reqDoc.availableQuantity || 0);
     const baseAvailable = currentAvailRaw > 0 ? currentAvailRaw : totalQty;
 
+    const productTitle = reqDoc.productTitle || reqDoc.title || "Product";
+
+    // ✅ Trader = reqDoc.userId  (notifyTo = "customer")
+    let traderDoc = null;
+    try {
+      const traderId = String(reqDoc.userId || "");
+      if (mongoose.Types.ObjectId.isValid(traderId)) {
+        traderDoc = await Trader.findById(traderId)
+          .select("_id name fcmToken")
+          .session(session);
+      }
+    } catch (e) {
+      traderDoc = null;
+    }
+
+    // ✅ Farmer/Vendor = vendorId (notifyTo = "vendor")
+    let farmerDoc = null;
+    try {
+      farmerDoc = await Farmer.findById(vendorId)
+        .select("_id name fcmToken")
+        .session(session);
+    } catch (e) {
+      farmerDoc = null;
+    }
+
     // ---------------- ACCEPT ----------------
     if (action === "accepted") {
-      // allow accept when pending OR rejected (so accept again after reject works)
       const st = String(vendor.vendorStatus || "pending");
       if (!["pending", "rejected"].includes(st)) {
         return res.status(400).json({
@@ -603,7 +705,6 @@ exports.adminAcceptRejectOffer = async (req, res) => {
         });
       }
 
-      // ✅ Idempotent subtract: only subtract if not already applied
       if (!vendor.inventoryAdded) {
         if (baseAvailable < offeredQty) {
           return res.status(400).json({
@@ -611,14 +712,8 @@ exports.adminAcceptRejectOffer = async (req, res) => {
             message: `Not enough availableQuantity. Need ${offeredQty}, have ${baseAvailable}`,
           });
         }
-
-        // ✅ EXACT NEED: 50 - 20 = 30
         reqDoc.availableQuantity = baseAvailable - offeredQty;
-
-        // ❌ As you asked now: DO NOT add/subtract inventory here
-        // reqDoc.inventory = ... (not touched)
-
-        vendor.inventoryAdded = true; // means offeredQty is already applied once
+        vendor.inventoryAdded = true;
       }
 
       vendor.vendorStatus = "accepted";
@@ -627,18 +722,112 @@ exports.adminAcceptRejectOffer = async (req, res) => {
       vendor.rejectionMessage = "";
 
       await reqDoc.save({ session });
+
+      // ✅ InApp - Trader (notifyTo: customer)
+      try {
+        if (traderDoc?._id) {
+          await InAppNotification.create(
+            [
+              {
+                userId: String(traderDoc._id),
+                notificationType: "OFFER_ACCEPTED",
+                thumbnailTitle: "✅ Offer Accepted",
+                notifyTo: "customer",
+                message: `Offer accepted for "${productTitle}" (Qty: ${offeredQty}).`,
+                metaData: {
+                  requirementId: String(reqDoc._id),
+                  vendorId: String(vendorId),
+                  action: "accepted",
+                  offeredQty,
+                },
+                status: "unread",
+              },
+            ],
+            { session }
+          );
+
+          if (traderDoc.fcmToken) {
+            traderPushQueue.push({
+              token: traderDoc.fcmToken,
+              title: "Offer Accepted ✅",
+              body: `Offer accepted for "${productTitle}".`,
+              data: {
+                type: "OFFER_ACCEPTED",
+                requirementId: String(reqDoc._id),
+                vendorId: String(vendorId),
+              },
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Trader InApp failed:", e.message);
+      }
+
+      // ✅ InApp - Farmer (notifyTo: vendor)
+      try {
+        if (farmerDoc?._id) {
+          await InAppNotification.create(
+            [
+              {
+                userId: String(farmerDoc._id),
+                notificationType: "YOUR_OFFER_ACCEPTED",
+                thumbnailTitle: "✅ Your Offer Accepted",
+                notifyTo: "vendor",
+                message: `Your offer for "${productTitle}" accepted (Qty: ${offeredQty}).`,
+                metaData: {
+                  requirementId: String(reqDoc._id),
+                  action: "accepted",
+                  offeredQty,
+                },
+                status: "unread",
+              },
+            ],
+            { session }
+          );
+
+          if (farmerDoc.fcmToken) {
+            farmerPushQueue.push({
+              token: farmerDoc.fcmToken,
+              title: "Offer Accepted ✅",
+              body: `Your offer for "${productTitle}" is accepted.`,
+              data: {
+                type: "YOUR_OFFER_ACCEPTED",
+                requirementId: String(reqDoc._id),
+              },
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Farmer InApp failed:", e.message);
+      }
+
       await session.commitTransaction();
+
+      // ✅ PUSH after commit
+      for (const p of traderPushQueue) {
+        try {
+          await sendPushNotificationTrader(p.token, p.title, p.body, p.data);
+        } catch (e) {
+          console.error("Trader push failed:", e.message);
+        }
+      }
+      for (const p of farmerPushQueue) {
+        try {
+          await sendPushNotification(p.token, p.title, p.body, p.data);
+        } catch (e) {
+          console.error("Farmer push failed:", e.message);
+        }
+      }
 
       return res.status(200).json({
         success: true,
-        message: `Accepted. availableQuantity updated to ${reqDoc.availableQuantity} (base ${baseAvailable} - offered ${offeredQty}).`,
+        message: `Accepted. availableQuantity now ${reqDoc.availableQuantity}.`,
         vendor,
         data: reqDoc,
       });
     }
 
     // ---------------- REJECT ----------------
-    // allow reject when pending OR accepted
     const st = String(vendor.vendorStatus || "pending");
     if (!["pending", "accepted"].includes(st)) {
       return res.status(400).json({
@@ -647,20 +836,12 @@ exports.adminAcceptRejectOffer = async (req, res) => {
       });
     }
 
-    // ✅ If this vendor was accepted earlier and we subtracted offeredQty, then add it back on reject.
-    // If vendor was pending and rejected directly, inventoryAdded will be false => no add-back.
     if (vendor.inventoryAdded === true) {
       const nowAvailRaw = Number(reqDoc.availableQuantity || 0);
       const nowAvailBase = nowAvailRaw > 0 ? nowAvailRaw : totalQty;
 
-      // add back but never exceed totalQty
-      const restored = Math.min(totalQty, nowAvailBase + offeredQty);
-      reqDoc.availableQuantity = restored;
-
-      vendor.inventoryAdded = false; // prevent double add-back
-
-      // ❌ As you asked: inventory should NOT be added back here
-      // reqDoc.inventory = ... (not touched)
+      reqDoc.availableQuantity = Math.min(totalQty, nowAvailBase + offeredQty);
+      vendor.inventoryAdded = false;
     }
 
     vendor.vendorStatus = "rejected";
@@ -669,7 +850,102 @@ exports.adminAcceptRejectOffer = async (req, res) => {
     vendor.rejectionMessage = rejectionMessage || "Rejected by admin";
 
     await reqDoc.save({ session });
+
+    // ✅ InApp - Trader (notifyTo: customer)
+    try {
+      if (traderDoc?._id) {
+        await InAppNotification.create(
+          [
+            {
+              userId: String(traderDoc._id),
+              notificationType: "OFFER_REJECTED",
+              thumbnailTitle: "❌ Offer Rejected",
+              notifyTo: "customer",
+              message: `Offer rejected for "${productTitle}".`,
+              metaData: {
+                requirementId: String(reqDoc._id),
+                vendorId: String(vendorId),
+                action: "rejected",
+                reason: vendor.rejectionMessage,
+              },
+              status: "unread",
+            },
+          ],
+          { session }
+        );
+
+        if (traderDoc.fcmToken) {
+          traderPushQueue.push({
+            token: traderDoc.fcmToken,
+            title: "Offer Rejected ❌",
+            body: `Offer rejected for "${productTitle}".`,
+            data: {
+              type: "OFFER_REJECTED",
+              requirementId: String(reqDoc._id),
+              vendorId: String(vendorId),
+            },
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Trader InApp failed:", e.message);
+    }
+
+    // ✅ InApp - Farmer (notifyTo: vendor)
+    try {
+      if (farmerDoc?._id) {
+        await InAppNotification.create(
+          [
+            {
+              userId: String(farmerDoc._id),
+              notificationType: "YOUR_OFFER_REJECTED",
+              thumbnailTitle: "❌ Your Offer Rejected",
+              notifyTo: "vendor",
+              message: `Your offer for "${productTitle}" rejected.`,
+              metaData: {
+                requirementId: String(reqDoc._id),
+                action: "rejected",
+                reason: vendor.rejectionMessage,
+              },
+              status: "unread",
+            },
+          ],
+          { session }
+        );
+
+        if (farmerDoc.fcmToken) {
+          farmerPushQueue.push({
+            token: farmerDoc.fcmToken,
+            title: "Offer Rejected ❌",
+            body: `Your offer for "${productTitle}" was rejected.`,
+            data: {
+              type: "YOUR_OFFER_REJECTED",
+              requirementId: String(reqDoc._id),
+            },
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Farmer InApp failed:", e.message);
+    }
+
     await session.commitTransaction();
+
+    // ✅ PUSH after commit
+    for (const p of traderPushQueue) {
+      try {
+        await sendPushNotificationTrader(p.token, p.title, p.body, p.data);
+      } catch (e) {
+        console.error("Trader push failed:", e.message);
+      }
+    }
+    for (const p of farmerPushQueue) {
+      try {
+        await sendPushNotification(p.token, p.title, p.body, p.data);
+      } catch (e) {
+        console.error("Farmer push failed:", e.message);
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -678,7 +954,10 @@ exports.adminAcceptRejectOffer = async (req, res) => {
       data: reqDoc,
     });
   } catch (err) {
-    await session.abortTransaction();
+    try {
+      await session.abortTransaction();
+    } catch (e) { }
+
     console.error("❌ adminAcceptRejectOffer error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
   } finally {
@@ -686,3 +965,178 @@ exports.adminAcceptRejectOffer = async (req, res) => {
   }
 };
 
+
+// exports.adminAcceptRejectOffer = async (req, res) => {
+//   const session = await mongoose.startSession();
+
+//   try {
+//     session.startTransaction();
+
+//     const requirementId = String(req.params.requirementId || "").trim();
+//     const vendorId = String(req.params.vendorId || "").trim();
+
+//     const action = String(req.body.action || "").trim(); // "accepted" | "rejected"
+//     const rejectionMessage = String(req.body.rejectionMessage || "").trim();
+
+//     if (!mongoose.Types.ObjectId.isValid(requirementId)) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Invalid requirementId" });
+//     }
+//     if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Invalid vendorId" });
+//     }
+
+//     if (!["accepted", "rejected"].includes(action)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid action. Use accepted or rejected",
+//       });
+//     }
+
+//     const reqDoc = await Requirement.findById(requirementId).session(session);
+//     if (!reqDoc) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Requirement not found" });
+//     }
+
+//     reqDoc.vendorData = Array.isArray(reqDoc.vendorData) ? reqDoc.vendorData : [];
+
+//     const idx = reqDoc.vendorData.findIndex(
+//       (v) => String(v.vendorId) === String(vendorId) && v.refre === "farmer"
+//     );
+
+//     if (idx < 0) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Vendor offer not found" });
+//     }
+
+//     const vendor = reqDoc.vendorData[idx];
+
+//     // ✅ Base quantity = requirement quantity (50 in your example)
+//     const totalQty = Number(reqDoc.quantity || 0);
+//     if (!Number.isFinite(totalQty) || totalQty <= 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid requirement quantity",
+//       });
+//     }
+
+//     // ✅ Use vendor offeredQuantity (20 in your example)
+//     const offeredQty = Number(vendor.offeredQuantity || 0);
+//     if (!Number.isFinite(offeredQty) || offeredQty <= 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid vendor offeredQuantity",
+//       });
+//     }
+
+//     if (offeredQty > totalQty) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `offeredQuantity (${offeredQty}) cannot be greater than requirement quantity (${totalQty})`,
+//       });
+//     }
+
+//     // ✅ Your case: availableQuantity is 0 initially, but you want it to behave like "50"
+//     // So if availableQuantity is missing/0, treat it as totalQty (50).
+//     const currentAvailRaw = Number(reqDoc.availableQuantity || 0);
+//     const baseAvailable = currentAvailRaw > 0 ? currentAvailRaw : totalQty;
+
+//     // ---------------- ACCEPT ----------------
+//     if (action === "accepted") {
+//       // allow accept when pending OR rejected (so accept again after reject works)
+//       const st = String(vendor.vendorStatus || "pending");
+//       if (!["pending", "rejected"].includes(st)) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `Cannot accept. Current vendorStatus: ${vendor.vendorStatus}`,
+//         });
+//       }
+
+//       // ✅ Idempotent subtract: only subtract if not already applied
+//       if (!vendor.inventoryAdded) {
+//         if (baseAvailable < offeredQty) {
+//           return res.status(400).json({
+//             success: false,
+//             message: `Not enough availableQuantity. Need ${offeredQty}, have ${baseAvailable}`,
+//           });
+//         }
+
+//         // ✅ EXACT NEED: 50 - 20 = 30
+//         reqDoc.availableQuantity = baseAvailable - offeredQty;
+
+//         // ❌ As you asked now: DO NOT add/subtract inventory here
+//         // reqDoc.inventory = ... (not touched)
+
+//         vendor.inventoryAdded = true; // means offeredQty is already applied once
+//       }
+
+//       vendor.vendorStatus = "accepted";
+//       vendor.acceptedAt = new Date();
+//       vendor.updatedAt = new Date();
+//       vendor.rejectionMessage = "";
+
+//       await reqDoc.save({ session });
+//       await session.commitTransaction();
+
+//       return res.status(200).json({
+//         success: true,
+//         message: `Accepted. availableQuantity updated to ${reqDoc.availableQuantity} (base ${baseAvailable} - offered ${offeredQty}).`,
+//         vendor,
+//         data: reqDoc,
+//       });
+//     }
+
+//     // ---------------- REJECT ----------------
+//     // allow reject when pending OR accepted
+//     const st = String(vendor.vendorStatus || "pending");
+//     if (!["pending", "accepted"].includes(st)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Cannot reject. Current vendorStatus: ${vendor.vendorStatus}`,
+//       });
+//     }
+
+//     // ✅ If this vendor was accepted earlier and we subtracted offeredQty, then add it back on reject.
+//     // If vendor was pending and rejected directly, inventoryAdded will be false => no add-back.
+//     if (vendor.inventoryAdded === true) {
+//       const nowAvailRaw = Number(reqDoc.availableQuantity || 0);
+//       const nowAvailBase = nowAvailRaw > 0 ? nowAvailRaw : totalQty;
+
+//       // add back but never exceed totalQty
+//       const restored = Math.min(totalQty, nowAvailBase + offeredQty);
+//       reqDoc.availableQuantity = restored;
+
+//       vendor.inventoryAdded = false; // prevent double add-back
+
+//       // ❌ As you asked: inventory should NOT be added back here
+//       // reqDoc.inventory = ... (not touched)
+//     }
+
+//     vendor.vendorStatus = "rejected";
+//     vendor.updatedAt = new Date();
+//     vendor.acceptedAt = null;
+//     vendor.rejectionMessage = rejectionMessage || "Rejected by admin";
+
+//     await reqDoc.save({ session });
+//     await session.commitTransaction();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: vendor.rejectionMessage,
+//       vendor,
+//       data: reqDoc,
+//     });
+//   } catch (err) {
+//     await session.abortTransaction();
+//     console.error("❌ adminAcceptRejectOffer error:", err);
+//     return res.status(500).json({ success: false, message: "Server error" });
+//   } finally {
+//     session.endSession();
+//   }
+// };
