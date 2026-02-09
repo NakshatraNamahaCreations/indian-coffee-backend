@@ -98,7 +98,7 @@ exports.createProduct = async (req, res) => {
 
       productImage,
       approvalStatus: "pending_admin",
-      status: "Inactive",
+      status: "Active",
     });
 
     return res.status(201).json({
