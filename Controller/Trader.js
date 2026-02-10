@@ -171,15 +171,7 @@ exports.register = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: "Registration successful",
-            data: {
-                _id: trader._id,
-                userType: trader.userType,
-                email: trader.email,
-                mobileNumber: trader.mobileNumber,
-                state: trader.state,
-                district: trader.district,
-                townVillage: trader.townVillage
-            }
+            data: trader,
         });
 
     } catch (err) {
