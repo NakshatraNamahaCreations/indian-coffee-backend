@@ -1,0 +1,40 @@
+1.Master 
+category ===
+dualcore
+AMD
+Core2duo
+corei3
+core i7
+core i
+core i9
+
+generation
+1st 20th dropdown
+
+Monitor Master
+
+1.HD
+2.Full Hd
+3.2k
+4.4k
+
+Product Add option added multiple
+1.serial Number
+2.system number
+that count show total quantity
+
+damaged / removed from stock
+
+Dashboard over all
+
+product category and all search option give 
+
+purchase management 
+
+
+
+
+
+
+
+
