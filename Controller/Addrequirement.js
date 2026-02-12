@@ -494,9 +494,10 @@ exports.updateApproval = async (req, res) => {
           const farmerNotis = farmers.map((f) => ({
             userId: String(f._id),
             notificationType: "NEW_PRODUCT_AVAILABLE",
-            thumbnailTitle: "🆕 New Product Available",
+            thumbnailTitle: "🆕 New Trader Requirement",
             notifyTo: "vendor",
-            message: `New product "${requirementTitle}" is now available. Check it in the app.`,
+            message: `There is a new requirement for "${requirementTitle}", See details`,
+            // message: `New product "${requirementTitle}" is now available. Check it in the app.`,
             metaData: {
               requirementId: String(updated._id),
               approvalStatus,

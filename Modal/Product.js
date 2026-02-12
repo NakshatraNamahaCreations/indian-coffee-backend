@@ -41,6 +41,12 @@ const productSchema = new mongoose.Schema(
         pincode: { type: String },
         talukVillage: { type: String },
         address: { type: String },
+        Certifications: {
+            type: String
+        },
+        Cupping_Notes: {
+            type: String
+        },
 
         availableDate: {
             type: Date,

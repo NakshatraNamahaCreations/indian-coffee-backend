@@ -42,7 +42,9 @@ exports.createProduct = async (req, res) => {
             weightUnit,
             vendorName,
             vendorId,
-            weightUnitName
+            weightUnitName,
+            Certifications,
+            Cupping_Notes
         } = req.body;
 
         const normalizedStatus = String(status || "").toLowerCase() === "active" ? "Active" : "Inactive";
@@ -72,8 +74,8 @@ exports.createProduct = async (req, res) => {
             subsubcategoryName: undefined,
 
             weightUnitId,
-            weightUnitName: weightUnit?.weightUnitName,
 
+            weightUnit,
             quantity: safeQty,
             availableQuantity: safeQty,
 
@@ -101,6 +103,9 @@ exports.createProduct = async (req, res) => {
             status: normalizedStatus,
             vendorName,
             vendorId,
+            weightUnitName,
+            Certifications,
+            Cupping_Notes
         };
 
         if (subsubcategoryId && String(subsubcategoryId).trim() !== "") {
