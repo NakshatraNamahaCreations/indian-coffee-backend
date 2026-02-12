@@ -164,9 +164,7 @@ exports.getLatestAvailableHighestPriceByUserParam = async (req, res) => {
                 .json({ success: false, message: "userId is required in params" });
         }
 
-        // ✅ We will match BOTH possibilities:
-        // 1) userId stored as string
-        // 2) userId stored as ObjectId
+
         const canBeObjectId = mongoose.Types.ObjectId.isValid(userId);
         const userObjectId = canBeObjectId ? new mongoose.Types.ObjectId(userId) : null;
 
@@ -193,8 +191,7 @@ exports.getLatestAvailableHighestPriceByUserParam = async (req, res) => {
                     {
                         $match: {
                             ...userMatch,
-                            // ✅ If you want ONLY admin data, uncomment next line
-                            // type: "admin",
+
                             date: { $gte: from, $lt: to },
                         },
                     },
@@ -235,7 +232,6 @@ exports.getLatestAvailableHighestPriceByUserParam = async (req, res) => {
             }
         };
 
-        // ✅ 1) Latest available date (today -> yesterday -> latest doc)
         let usedFrom = startOfToday;
         let usedTo = startOfTomorrow;
 
@@ -250,7 +246,6 @@ exports.getLatestAvailableHighestPriceByUserParam = async (req, res) => {
         if (!todayList.length) {
             const latestDoc = await DailyMarketPrice.findOne({
                 ...userMatch,
-                // type: "admin",
             })
                 .sort({ date: -1 })
                 .select("date");
@@ -275,10 +270,8 @@ exports.getLatestAvailableHighestPriceByUserParam = async (req, res) => {
             todayList = await getMaxPerItemForRange(usedFrom, usedTo);
         }
 
-        // ✅ 2) Previous available date before usedFrom
         const prevDoc = await DailyMarketPrice.findOne({
             ...userMatch,
-            // type: "admin",
             date: { $lt: usedFrom },
         })
             .sort({ date: -1 })
@@ -296,7 +289,6 @@ exports.getLatestAvailableHighestPriceByUserParam = async (req, res) => {
             prevList = await getMaxPerItemForRange(prevFrom, prevTo);
         }
 
-        // ✅ 3) Compute change
         const prevMap = new Map();
         (prevList || []).forEach((x) => {
             const key = `${x.categoryName}||${x.dailycategoryName}`;

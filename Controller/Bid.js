@@ -931,6 +931,8 @@ exports.adminApproveBid = async (req, res) => {
             return res.status(400).json({ success: false, error: "Invalid bid quantity" });
         }
 
+        console.log("bidQty", bidQty);
+
         const product = await Product.findOneAndUpdate(
             { _id: bid.productId, availableQuantity: { $gte: bidQty } },
             {
@@ -940,12 +942,14 @@ exports.adminApproveBid = async (req, res) => {
             { new: true }
         );
 
-        if (!product) {
-            return res.status(400).json({
-                success: false,
-                error: "Insufficient product quantity / product not found",
-            });
-        }
+        console.log("product", product)
+
+        // if (!product) {
+        //     return res.status(400).json({
+        //         success: false,
+        //         error: "Insufficient product quantity / product not found",
+        //     });
+        // }
 
         bid.status = "admin_approved";
         await bid.save();
