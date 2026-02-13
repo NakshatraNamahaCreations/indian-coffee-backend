@@ -74,4 +74,19 @@ exports.fetchmarknotification = async (req, res) => {
     }
 }
 
+exports.getAllNotifications = async (req, res) => {
+    try {
+        const notifications = await InAppNotification.find({})
+            .sort({ createdAt: -1 })
+            .lean();
 
+        res.status(200).json({
+            message: "All notifications fetched successfully",
+            total: notifications.length,
+            notifications,
+        });
+    } catch (error) {
+        console.error("Error fetching all notifications:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
