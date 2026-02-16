@@ -47,6 +47,8 @@ const farmerRoute = require("./Route/Farmer");
 const requirementRoute = require("./Route/Addrequirement");
 const farmerbannerRoute = require("./Route/Farmerbanner");
 const notificationRoute = require("./Route/Notification");
+const planRoute = require("./Route/Plan");
+const couponRoute = require("./Route/Coupon");
 
 app.use("/api", adminRoute);
 app.use("/api", categoryRoute);
@@ -66,6 +68,8 @@ app.use("/api/farmer", farmerRoute);
 app.use("/api/requirement", requirementRoute);
 app.use("/api/farmerbanner", farmerbannerRoute);
 app.use("/api/notification", notificationRoute);
+app.use("/api/plan", planRoute);
+app.use("/api/coupon", couponRoute);
 
 const PORT = process.env.PORT || 8000;
 require("./corn/unlockProduct");
