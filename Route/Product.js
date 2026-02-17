@@ -119,5 +119,8 @@ router.put("/:id/featured-toggle", controller.toggleFeatureProduct);
 
 // ✅ Upload Single Product File by product ID
 router.put("/:id/upload-product-file", uploadProductFile, controller.uploadProductFile);
+router.put("/bid/active", controller.updateProductBidActive);
+router.put("/selling/update", controller.updateSellingDetails);
+
 
 module.exports = router;

@@ -594,3 +594,114 @@ exports.uploadProductFile = async (req, res) => {
         return res.status(500).json({ success: false, message: err.message });
     }
 };
+
+exports.updateSellingDetails = async (req, res) => {
+    try {
+        const { productId, vendorId, sellingQuantity, sellingDate } = req.body;
+
+        if (!productId || !vendorId) {
+            return res.status(400).json({ success: false, message: "productId and vendorId are required" });
+        }
+
+        const qty = Number(sellingQuantity);
+        if (!Number.isFinite(qty) || qty < 0) {
+            return res.status(400).json({ success: false, message: "sellingQuantity must be a valid number >= 0" });
+        }
+
+        const product = await Product.findOne({ _id: productId, vendorId: String(vendorId) });
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                message: "Product not found for this vendorId + productId",
+            });
+        }
+
+        product.sellingQuantity = qty;
+
+        product.sellingDate = sellingDate ? new Date(sellingDate) : new Date();
+
+        await product.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Selling details updated",
+            data: product,
+        });
+    } catch (err) {
+        console.log("updateSellingDetails error:", err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+
+exports.updateProductBidActive = async (req, res) => {
+    try {
+        const { productId, vendorId } = req.body;
+
+        if (!productId || !vendorId) {
+            return res.status(400).json({
+                success: false,
+                message: "productId and vendorId are required",
+            });
+        }
+
+        const product = await Product.findOne({
+            _id: productId,
+            vendorId: String(vendorId),
+        });
+
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                message: "Product not found for this vendorId + productId",
+            });
+        }
+
+        // ✅ toggle
+        product.bidActive = !product.bidActive;
+        await product.save();
+
+        return res.status(200).json({
+            success: true,
+            message: `Product bidActive toggled to ${product.bidActive}`,
+            data: product,
+        });
+    } catch (err) {
+        console.log("toggleProductBidActive error:", err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+
+// exports.updateProductBidActive = async (req, res) => {
+//     try {
+//         const { productId, vendorId, bidActive } = req.body;
+
+//         if (!productId || !vendorId) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "productId and vendorId are required",
+//             });
+//         }
+
+//         const product = await Product.findOne({ _id: productId, vendorId: String(vendorId) });
+//         if (!product) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Product not found for this vendorId + productId",
+//             });
+//         }
+
+//         product.bidActive = Boolean(bidActive);
+//         await product.save();
+
+//         return res.status(200).json({
+//             success: true,
+//             message: `Product bidActive updated to ${product.bidActive}`,
+//             data: product,
+//         });
+//     } catch (err) {
+//         console.log("updateProductBidActive error:", err);
+//         return res.status(500).json({ success: false, message: err.message });
+//     }
+// };

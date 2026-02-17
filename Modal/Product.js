@@ -50,7 +50,6 @@ const productSchema = new mongoose.Schema(
 
         availableDate: {
             type: Date,
-            // required: true,
         },
 
         productImages: { type: [String], default: [] },
@@ -74,6 +73,9 @@ const productSchema = new mongoose.Schema(
             default: false
         },
         productFile: { type: String, default: "" },
+        sellingQuantity: { type: Number, default: 0, min: 0 },
+        sellingDate: { type: Date, default: Date.now },
+        bidActive: { type: Boolean, default: false },
 
         status: { type: String, enum: ["Active", "Inactive"], default: "Inactive" },
     },

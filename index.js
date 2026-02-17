@@ -18,7 +18,6 @@ mongoose
     .catch((err) => console.log("Database Not connected !!!", err));
 
 
-// app.use("/uploads", express.static("uploads"));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 
@@ -26,7 +25,6 @@ app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 app.use(cors());
 app.use(morgan("dev"));
-// app.use(express.static("public"));
 app.use(express.urlencoded({ extended: true }));
 
 const adminRoute = require("./Route/Admin");
@@ -49,6 +47,7 @@ const farmerbannerRoute = require("./Route/Farmerbanner");
 const notificationRoute = require("./Route/Notification");
 const planRoute = require("./Route/Plan");
 const couponRoute = require("./Route/Coupon");
+const { startResetSellingCron } = require("./corn/resetSellingDaily");
 
 app.use("/api", adminRoute);
 app.use("/api", categoryRoute);
@@ -70,6 +69,8 @@ app.use("/api/farmerbanner", farmerbannerRoute);
 app.use("/api/notification", notificationRoute);
 app.use("/api/plan", planRoute);
 app.use("/api/coupon", couponRoute);
+
+startResetSellingCron();
 
 const PORT = process.env.PORT || 8000;
 require("./corn/unlockProduct");
