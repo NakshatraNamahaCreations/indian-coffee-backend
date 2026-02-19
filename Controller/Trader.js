@@ -389,7 +389,7 @@ exports.login = async (req, res) => {
         if (!trader) {
             return res.status(400).json({
                 success: false,
-                message: "Invalid email or password",
+                message: "Invalid email",
             });
         }
 
@@ -397,7 +397,7 @@ exports.login = async (req, res) => {
         if (!isMatch) {
             return res.status(400).json({
                 success: false,
-                message: "Invalid email or password",
+                message: "Invalid password",
             });
         }
 
