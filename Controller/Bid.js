@@ -892,7 +892,8 @@ exports.vendorRejectBid = async (req, res) => {
 //             });
 //         }
 
-
+//         // ✅ inventory decrement (your existing logic)
+//         // ✅ AND sellingQuantity => 0 (because this selling lot is completed)
 //         const product = await Product.findOneAndUpdate(
 //             { _id: bid.productId, availableQuantity: { $gte: bidQty } },
 //             {
@@ -901,7 +902,7 @@ exports.vendorRejectBid = async (req, res) => {
 //                     isLocked: false,
 //                     lockedBy: null,
 //                     lockExpiresAt: null,
-//                     sellingQuantity: 0,
+//                     sellingQuantity: 0, // ✅ IMPORTANT
 //                 },
 //             },
 //             { new: true, session }
@@ -1006,76 +1007,74 @@ exports.vendorRejectBid = async (req, res) => {
 exports.adminApproveBid = async (req, res) => {
     const session = await mongoose.startSession();
 
-    let bid = null;
-    let product = null;
-
     try {
         session.startTransaction();
 
         const bidId = String(req.params.id || "").trim();
         if (!mongoose.Types.ObjectId.isValid(bidId)) {
             await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({ success: false, error: "Invalid Bid ID" });
         }
 
-        bid = await Bid.findById(bidId).session(session);
+        const bid = await Bid.findById(bidId).session(session);
         if (!bid) {
             await session.abortTransaction();
+            session.endSession();
             return res.status(404).json({ success: false, error: "Bid not found" });
-        }
-
-        // ✅ Prevent double approval (prevents double stock deduction)
-        if (String(bid.status) === "admin_approved") {
-            await session.abortTransaction();
-            return res.status(400).json({
-                success: false,
-                error: "Bid already admin approved",
-            });
         }
 
         const bidQty = Number(bid.quantityBags);
         if (!Number.isFinite(bidQty) || bidQty <= 0) {
             await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({ success: false, error: "Invalid bid quantity" });
         }
 
-        // ✅ Fetch product in txn
+        // ✅ Fetch product inside session
         const existingProduct = await Product.findById(bid.productId).session(session);
         if (!existingProduct) {
             await session.abortTransaction();
+            session.endSession();
             return res.status(404).json({ success: false, error: "Product not found" });
         }
 
-        // ✅ STRICT sellingQuantity rule (keep if your business logic needs this)
-        const currentSellingQty = Number(existingProduct.sellingQuantity || 0);
-        if (currentSellingQty > 0 && bidQty !== currentSellingQty) {
-            await session.abortTransaction();
-            return res.status(400).json({
-                success: false,
-                error: `Bid qty mismatch. Must be exactly sellingQuantity (${currentSellingQty}).`,
-            });
+        // ✅ If already admin approved => just ensure sellingQuantity=0 + unlock
+        if (String(bid.status) === "admin_approved") {
+            const product = await Product.findByIdAndUpdate(
+                bid.productId,
+                {
+                    $set: {
+                        isLocked: false,
+                        lockedBy: null,
+                        lockExpiresAt: null,
+                        sellingQuantity: 0,
+                    },
+                },
+                { new: true, session }
+            );
+
+            await session.commitTransaction();
+            session.endSession();
+
+            // Optional: Re-send notifications if needed for idempotency
+            return res.json({ success: true, bid, product, message: "Bid already approved" });
         }
 
-        // ✅ Stock check
-        const currentAvailableQty = Number(existingProduct.availableQuantity || 0);
-        if (currentAvailableQty < bidQty) {
-            await session.abortTransaction();
-            return res.status(400).json({
-                success: false,
-                error: "Not enough stock to approve this bid",
-            });
-        }
-
-        // ✅ Deduct stock + reset sellingQuantity + unlock
-        product = await Product.findByIdAndUpdate(
-            bid.productId,
+        // ✅ KEY FIX: Use bid.quantityBags directly - NO sellingQuantity validation
+        // Deduct inventory based on actual bid quantity, reset sellingQuantity to 0
+        const product = await Product.findOneAndUpdate(
             {
-                $inc: { availableQuantity: -bidQty }, // ✅ FINAL COMMIT HERE
+                _id: bid.productId,
+                availableQuantity: { $gte: bidQty } // Ensure sufficient stock
+            },
+            {
+                $inc: { availableQuantity: -bidQty }, // e.g., 100 - 30 = 70
                 $set: {
                     isLocked: false,
                     lockedBy: null,
                     lockExpiresAt: null,
-                    sellingQuantity: 0, // ✅ correct on admin approval
+                    sellingQuantity: 0, // Reset after approval - lot is sold
                 },
             },
             { new: true, session }
@@ -1083,9 +1082,10 @@ exports.adminApproveBid = async (req, res) => {
 
         if (!product) {
             await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({
                 success: false,
-                error: "Stock update failed",
+                error: "Not enough stock to approve this bid",
             });
         }
 
@@ -1096,11 +1096,8 @@ exports.adminApproveBid = async (req, res) => {
         await session.commitTransaction();
         session.endSession();
 
-        // ✅ Notifications should be AFTER commit
-        // ------------------------------------------------
-        // Push Notifications
+        // ✅ Push Notifications (outside transaction - safe to fail)
         try {
-            // Trader push
             if (bid.userId) {
                 const trader = await Trader.findById(bid.userId).lean();
                 if (trader?.fcmToken) {
@@ -1112,7 +1109,6 @@ exports.adminApproveBid = async (req, res) => {
                 }
             }
 
-            // Farmer push
             if (product?.vendorId) {
                 const farmer = await Farmer.findById(product.vendorId).lean();
                 if (farmer?.fcmToken) {
@@ -1127,9 +1123,8 @@ exports.adminApproveBid = async (req, res) => {
             console.log("adminApproveBid push error:", pushErr?.message || pushErr);
         }
 
-        // In-app Notifications
+        // ✅ In-App Notifications (outside transaction)
         try {
-            // Trader in-app
             if (bid.userId) {
                 await InAppNotification.create({
                     userId: safeId(bid.userId),
@@ -1144,12 +1139,12 @@ exports.adminApproveBid = async (req, res) => {
                         traderId: safeId(bid.userId),
                         status: "admin_approved",
                         quantityBags: Number(bid.quantityBags || 0),
+                        approvedQuantity: bidQty, // Optional audit field
                     },
                     status: "unread",
                 });
             }
 
-            // Farmer in-app
             if (product?.vendorId) {
                 await InAppNotification.create({
                     userId: safeId(product.vendorId),
@@ -1164,6 +1159,7 @@ exports.adminApproveBid = async (req, res) => {
                         traderId: safeId(bid.userId),
                         status: "admin_approved",
                         quantityBags: Number(bid.quantityBags || 0),
+                        approvedQuantity: bidQty, // Optional audit field
                     },
                     status: "unread",
                 });
@@ -1172,20 +1168,34 @@ exports.adminApproveBid = async (req, res) => {
             console.log("adminApproveBid in-app error:", notiErr?.message || notiErr);
         }
 
-        return res.json({ success: true, bid, product });
+        return res.json({
+            success: true,
+            bid,
+            product,
+            message: "Bid approved successfully",
+            inventoryUpdate: {
+                previousAvailable: existingProduct.availableQuantity,
+                deducted: bidQty,
+                newAvailable: product.availableQuantity
+            }
+        });
+
     } catch (error) {
         try {
             await session.abortTransaction();
-        } catch (e) { }
-        try {
             session.endSession();
-        } catch (e) { }
+        } catch (e) {
+            console.error("Transaction abort error:", e);
+        }
 
         console.error("adminApproveBid error:", error);
-        return res.status(500).json({ success: false, error: error.message });
+        return res.status(500).json({
+            success: false,
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
-
 
 exports.adminrejectBid = async (req, res) => {
     const session = await mongoose.startSession();
