@@ -5,6 +5,8 @@ const Subsubcategory = require("../Modal/Subsubcategory");
 const WeightUnit = require("../Modal/Weightunit");
 const Payment = require("../Modal/Payment");
 const sendPushNotification = require("../utils/sendPushNotification");
+const sendTraderPushnotification = require("../utilstrader/sendPushNotification");
+const Trader = require("../Modal/Trader");
 const Farmer = require("../Modal/Farmer");
 const { default: mongoose } = require("mongoose");
 const InAppNotification = require("../Modal/Notification");
@@ -274,6 +276,63 @@ exports.createProduct = async (req, res) => {
 
 
 
+// exports.updateProductStatus = async (req, res) => {
+//     try {
+//         const { status } = req.body;
+
+//         const normalizedStatus =
+//             String(status || "").toLowerCase() === "active" ? "Active" : "Inactive";
+
+//         // ✅ update product
+//         const updatedProduct = await Product.findByIdAndUpdate(
+//             req.params.id,
+//             { status: normalizedStatus },
+//             { new: true }
+//         );
+
+//         if (!updatedProduct) {
+//             return res.status(404).json({ success: false, message: "Product not found" });
+//         }
+
+//         console.log("updatedProduct", updatedProduct);
+
+//         // ✅ convert vendorId string -> ObjectId safely
+//         let vendorObjectId = null;
+//         if (updatedProduct.vendorId && mongoose.Types.ObjectId.isValid(updatedProduct.vendorId)) {
+//             vendorObjectId = new mongoose.Types.ObjectId(updatedProduct.vendorId);
+//         }
+
+//         // ✅ find vendor/farmer
+//         const vendor = vendorObjectId ? await Farmer.findById(vendorObjectId) : null;
+
+//         // ✅ get token (change field name if yours differs)
+//         const fcmToken = vendor?.fcmToken;
+
+//         // ✅ send push
+//         const title = "Product Status Updated";
+//         const body =
+//             normalizedStatus === "Active"
+//                 ? `✅ Your product "${updatedProduct.productTitle}" is now Active.`
+//                 : `⏸️ Your product "${updatedProduct.productTitle}" is now Inactive.`;
+
+//         if (fcmToken) {
+//             await sendPushNotification(fcmToken, title, body);
+//         } else {
+//             console.log("No fcmToken for vendor:", updatedProduct.vendorId);
+//         }
+
+//         return res.status(200).json({
+//             success: true,
+//             message: "Status updated successfully",
+//             data: updatedProduct,
+//         });
+//     } catch (err) {
+//         console.log("updateProductStatus error:", err);
+//         return res.status(500).json({ success: false, message: err.message });
+//     }
+// };
+
+
 exports.updateProductStatus = async (req, res) => {
     try {
         const { status } = req.body;
@@ -292,31 +351,64 @@ exports.updateProductStatus = async (req, res) => {
             return res.status(404).json({ success: false, message: "Product not found" });
         }
 
-        console.log("updatedProduct", updatedProduct);
+        // ✅ vendor push (existing logic)
+        try {
+            let vendorObjectId = null;
+            if (
+                updatedProduct.vendorId &&
+                mongoose.Types.ObjectId.isValid(updatedProduct.vendorId)
+            ) {
+                vendorObjectId = new mongoose.Types.ObjectId(updatedProduct.vendorId);
+            }
 
-        // ✅ convert vendorId string -> ObjectId safely
-        let vendorObjectId = null;
-        if (updatedProduct.vendorId && mongoose.Types.ObjectId.isValid(updatedProduct.vendorId)) {
-            vendorObjectId = new mongoose.Types.ObjectId(updatedProduct.vendorId);
+            const vendor = vendorObjectId ? await Farmer.findById(vendorObjectId) : null;
+            const fcmToken = vendor?.fcmToken;
+
+            const title = "Product Status Updated";
+            const body =
+                normalizedStatus === "Active"
+                    ? `✅ Your product "${updatedProduct.productTitle}" is now Active.`
+                    : `⏸️ Your product "${updatedProduct.productTitle}" is now Inactive.`;
+
+            if (fcmToken) {
+                await sendPushNotification(fcmToken, title, body);
+            }
+        } catch (e) {
+            console.log("Vendor push failed:", e.message);
         }
 
-        // ✅ find vendor/farmer
-        const vendor = vendorObjectId ? await Farmer.findById(vendorObjectId) : null;
+        // ✅ NEW: if status is Active -> notify ALL traders
+        if (normalizedStatus === "Active") {
+            try {
+                // get all traders with valid tokens
+                const traders = await Trader.find(
+                    { fcmToken: { $exists: true, $ne: "" } },
+                    { fcmToken: 1, _id: 1 }
+                ).lean();
 
-        // ✅ get token (change field name if yours differs)
-        const fcmToken = vendor?.fcmToken;
+                if (traders.length) {
+                    const title = "New Product Available";
+                    const body = `🔥 "${updatedProduct.productTitle}" is now Active. Check it out!`;
 
-        // ✅ send push
-        const title = "Product Status Updated";
-        const body =
-            normalizedStatus === "Active"
-                ? `✅ Your product "${updatedProduct.productTitle}" is now Active.`
-                : `⏸️ Your product "${updatedProduct.productTitle}" is now Inactive.`;
+                    // send in batches (avoid huge burst)
+                    const BATCH_SIZE = 400;
+                    for (let i = 0; i < traders.length; i += BATCH_SIZE) {
+                        const batch = traders.slice(i, i + BATCH_SIZE);
 
-        if (fcmToken) {
-            await sendPushNotification(fcmToken, title, body);
-        } else {
-            console.log("No fcmToken for vendor:", updatedProduct.vendorId);
+                        await Promise.allSettled(
+                            batch.map((t) =>
+                                sendTraderPushnotification(t.fcmToken, title, body)
+                            )
+                        );
+                    }
+
+                    console.log(`Trader push sent to ${traders.length} traders`);
+                } else {
+                    console.log("No traders with fcmToken found");
+                }
+            } catch (e) {
+                console.log("Trader push failed:", e.message);
+            }
         }
 
         return res.status(200).json({
@@ -329,7 +421,6 @@ exports.updateProductStatus = async (req, res) => {
         return res.status(500).json({ success: false, message: err.message });
     }
 };
-
 
 exports.getAllProducts = async (req, res) => {
     try {
@@ -809,6 +900,39 @@ exports.updateProductBidActive = async (req, res) => {
         product.bidActive = !product.bidActive;
         await product.save();
 
+        // ✅ If bidActive turned ON -> notify ALL traders
+        if (product.bidActive === true) {
+            try {
+                const traders = await Trader.find(
+                    { fcmToken: { $exists: true, $ne: "" } },
+                    { fcmToken: 1 }
+                ).lean();
+
+                if (traders.length) {
+                    const title = "Bidding Started";
+                    const body = `✅ Bidding is now available for "${product.productTitle}". Place your bid now!`;
+
+                    // batching to avoid overload
+                    const BATCH_SIZE = 400;
+                    for (let i = 0; i < traders.length; i += BATCH_SIZE) {
+                        const batch = traders.slice(i, i + BATCH_SIZE);
+
+                        await Promise.allSettled(
+                            batch.map((t) =>
+                                sendTraderPushnotification(t.fcmToken, title, body)
+                            )
+                        );
+                    }
+
+                    console.log(`BidActive ON: notified ${traders.length} traders`);
+                } else {
+                    console.log("No traders with fcmToken found");
+                }
+            } catch (notiErr) {
+                console.log("Trader notification failed:", notiErr.message);
+            }
+        }
+
         return res.status(200).json({
             success: true,
             message: `Product bidActive toggled to ${product.bidActive}`,
@@ -819,6 +943,44 @@ exports.updateProductBidActive = async (req, res) => {
         return res.status(500).json({ success: false, message: err.message });
     }
 };
+
+// exports.updateProductBidActive = async (req, res) => {
+//     try {
+//         const { productId, vendorId } = req.body;
+
+//         if (!productId || !vendorId) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "productId and vendorId are required",
+//             });
+//         }
+
+//         const product = await Product.findOne({
+//             _id: productId,
+//             vendorId: String(vendorId),
+//         });
+
+//         if (!product) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Product not found for this vendorId + productId",
+//             });
+//         }
+
+//         // ✅ toggle
+//         product.bidActive = !product.bidActive;
+//         await product.save();
+
+//         return res.status(200).json({
+//             success: true,
+//             message: `Product bidActive toggled to ${product.bidActive}`,
+//             data: product,
+//         });
+//     } catch (err) {
+//         console.log("toggleProductBidActive error:", err);
+//         return res.status(500).json({ success: false, message: err.message });
+//     }
+// };
 
 
 // exports.updateProductBidActive = async (req, res) => {
