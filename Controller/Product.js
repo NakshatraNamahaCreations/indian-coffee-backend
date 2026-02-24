@@ -7,6 +7,126 @@ const Payment = require("../Modal/Payment");
 const sendPushNotification = require("../utils/sendPushNotification");
 const Farmer = require("../Modal/Farmer");
 const { default: mongoose } = require("mongoose");
+const InAppNotification = require("../Modal/Notification");
+
+
+
+// exports.createProduct = async (req, res) => {
+//     try {
+//         const {
+//             productTitle,
+//             categoryId,
+//             subcategoryId,
+//             subsubcategoryId,
+//             weightUnitId,
+//             quantity,
+//             pricePerUnit,
+//             advancePayment,
+//             postHarvestProcess,
+//             beanSize,
+//             beanShape,
+//             cropYear,
+//             scaScore,
+//             moisture,
+//             maxDefects,
+//             minDefects,
+//             packagingForShipment,
+//             minimumQuantity,
+//             country,
+//             state,
+//             cityDistrict,
+//             pincode,
+//             talukVillage,
+//             address,
+//             availableDate,
+//             agreeTermsAndCondition,
+//             status,
+//             weightUnit,
+//             vendorName,
+//             vendorId,
+//             weightUnitName,
+//             Certifications,
+//             Cupping_Notes
+//         } = req.body;
+
+//         const normalizedStatus = String(status || "").toLowerCase() === "active" ? "Active" : "Inactive";
+
+//         // ✅ MULTI FILE PATHS
+//         const productImages =
+//             (req.files || []).map((f) => String(f.path).replace(/\\/g, "/"));
+
+//         const category = categoryId ? await Category.findById(categoryId) : null;
+//         const subcategory = subcategoryId ? await Subcategory.findById(subcategoryId) : null;
+//         const subsubcategory =
+//             subsubcategoryId && String(subsubcategoryId).trim() !== ""
+//                 ? await Subsubcategory.findById(subsubcategoryId)
+//                 : null;
+
+//         const qtyNum = Number(quantity);
+//         const safeQty = Number.isFinite(qtyNum) && qtyNum > 0 ? qtyNum : 0;
+
+//         const productData = {
+//             productTitle,
+//             categoryId,
+//             categoryName: category?.Categoryname,
+//             subcategoryId,
+//             subcategoryName: subcategory?.subcategoryName,
+
+//             subsubcategoryId: undefined,
+//             subsubcategoryName: undefined,
+
+//             weightUnitId,
+
+//             weightUnit,
+//             quantity: safeQty,
+//             availableQuantity: safeQty,
+
+//             pricePerUnit,
+//             advancePayment,
+//             postHarvestProcess,
+//             beanSize,
+//             beanShape,
+//             cropYear,
+//             scaScore,
+//             moisture,
+//             maxDefects,
+//             minDefects,
+//             packagingForShipment,
+//             minimumQuantity,
+//             country,
+//             state,
+//             cityDistrict,
+//             pincode,
+//             talukVillage,
+//             address,
+//             availableDate,
+//             productImages,
+//             agreeTermsAndCondition,
+//             status: normalizedStatus,
+//             vendorName,
+//             vendorId,
+//             weightUnitName,
+//             Certifications,
+//             Cupping_Notes
+//         };
+
+//         if (subsubcategoryId && String(subsubcategoryId).trim() !== "") {
+//             productData.subsubcategoryId = subsubcategoryId;
+//             productData.subsubcategoryName = subsubcategory?.subsubcategoryName;
+//         } else {
+//             delete productData.subsubcategoryId;
+//             delete productData.subsubcategoryName;
+//         }
+
+//         const product = new Product(productData);
+//         await product.save();
+
+//         return res.status(201).json({ success: true, data: product });
+//     } catch (err) {
+//         console.error("Create Product Error:", err);
+//         return res.status(500).json({ success: false, message: err.message });
+//     }
+// };
 
 
 exports.createProduct = async (req, res) => {
@@ -116,8 +236,34 @@ exports.createProduct = async (req, res) => {
             delete productData.subsubcategoryName;
         }
 
+
+
         const product = new Product(productData);
         await product.save();
+
+        try {
+            const vName = vendorName || "Vendor";
+            const pTitle = productTitle || "New Product";
+
+            await InAppNotification.create({
+                userId: "", // ✅ not empty now
+                notificationType: "PRODUCT_CREATED",
+                thumbnailTitle: "New product created",
+                notifyTo: "admin",
+                message: `${vName} created a product: ${pTitle} (Status: ${normalizedStatus}).`,
+                metaData: {
+                    productId: String(product._id),
+                    vendorId: vendorId ? String(vendorId) : null,
+                    vendorName: vendorName || "",
+                    status: normalizedStatus,
+                    categoryId: categoryId ? String(categoryId) : null,
+                    subcategoryId: subcategoryId ? String(subcategoryId) : null,
+                },
+                status: "unread",
+            });
+        } catch (notiErr) {
+            console.error("In-app notification save failed:", notiErr.message);
+        }
 
         return res.status(201).json({ success: true, data: product });
     } catch (err) {
@@ -125,6 +271,8 @@ exports.createProduct = async (req, res) => {
         return res.status(500).json({ success: false, message: err.message });
     }
 };
+
+
 
 exports.updateProductStatus = async (req, res) => {
     try {

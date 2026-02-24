@@ -113,6 +113,7 @@ router.get("/products/vendor/:vendorId", controller.getProductsByVendor);
 router.get("/products/vendoractive/:vendorId", controller.getProductsByVendordata);
 router.get("/products/search", controller.searchProducts);
 
+
 // Product Updated
 router.get("/featured", controller.getFeaturedProducts);
 router.put("/:id/featured-toggle", controller.toggleFeatureProduct);
