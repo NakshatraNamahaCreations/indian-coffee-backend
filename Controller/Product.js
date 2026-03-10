@@ -12,7 +12,6 @@ const { default: mongoose } = require("mongoose");
 const InAppNotification = require("../Modal/Notification");
 
 
-
 // exports.createProduct = async (req, res) => {
 //     try {
 //         const {
@@ -120,8 +119,34 @@ const InAppNotification = require("../Modal/Notification");
 //             delete productData.subsubcategoryName;
 //         }
 
+
+
 //         const product = new Product(productData);
 //         await product.save();
+
+//         try {
+//             const vName = vendorName || "Vendor";
+//             const pTitle = productTitle || "New Product";
+
+//             await InAppNotification.create({
+//                 userId: "", // ✅ not empty now
+//                 notificationType: "PRODUCT_CREATED",
+//                 thumbnailTitle: "New product created",
+//                 notifyTo: "admin",
+//                 message: `${vName} created a product: ${pTitle} (Status: ${normalizedStatus}).`,
+//                 metaData: {
+//                     productId: String(product._id),
+//                     vendorId: vendorId ? String(vendorId) : null,
+//                     vendorName: vendorName || "",
+//                     status: normalizedStatus,
+//                     categoryId: categoryId ? String(categoryId) : null,
+//                     subcategoryId: subcategoryId ? String(subcategoryId) : null,
+//                 },
+//                 status: "unread",
+//             });
+//         } catch (notiErr) {
+//             console.error("In-app notification save failed:", notiErr.message);
+//         }
 
 //         return res.status(201).json({ success: true, data: product });
 //     } catch (err) {
@@ -166,14 +191,21 @@ exports.createProduct = async (req, res) => {
             vendorId,
             weightUnitName,
             Certifications,
-            Cupping_Notes
+            Cupping_Notes,
         } = req.body;
 
-        const normalizedStatus = String(status || "").toLowerCase() === "active" ? "Active" : "Inactive";
+        const normalizedStatus =
+            String(status || "").toLowerCase() === "active" ? "Active" : "Inactive";
 
-        // ✅ MULTI FILE PATHS
-        const productImages =
-            (req.files || []).map((f) => String(f.path).replace(/\\/g, "/"));
+        // ✅ handle multer.fields()
+        const productImages = (req.files?.productImages || []).map((file) =>
+            String(file.path).replace(/\\/g, "/")
+        );
+
+        const productvideofile =
+            req.files?.productvideofile?.[0]?.path
+                ? String(req.files.productvideofile[0].path).replace(/\\/g, "/")
+                : "";
 
         const category = categoryId ? await Category.findById(categoryId) : null;
         const subcategory = subcategoryId ? await Subcategory.findById(subcategoryId) : null;
@@ -188,19 +220,13 @@ exports.createProduct = async (req, res) => {
         const productData = {
             productTitle,
             categoryId,
-            categoryName: category?.Categoryname,
+            categoryName: category?.Categoryname || "",
             subcategoryId,
-            subcategoryName: subcategory?.subcategoryName,
-
-            subsubcategoryId: undefined,
-            subsubcategoryName: undefined,
-
+            subcategoryName: subcategory?.subcategoryName || "",
             weightUnitId,
-
             weightUnit,
             quantity: safeQty,
             availableQuantity: safeQty,
-
             pricePerUnit,
             advancePayment,
             postHarvestProcess,
@@ -219,26 +245,22 @@ exports.createProduct = async (req, res) => {
             pincode,
             talukVillage,
             address,
-            availableDate,
+            availableDate: availableDate ? new Date(availableDate) : null,
             productImages,
+            productvideofile, // ✅ save video path
             agreeTermsAndCondition,
             status: normalizedStatus,
             vendorName,
             vendorId,
             weightUnitName,
             Certifications,
-            Cupping_Notes
+            Cupping_Notes,
         };
 
         if (subsubcategoryId && String(subsubcategoryId).trim() !== "") {
             productData.subsubcategoryId = subsubcategoryId;
-            productData.subsubcategoryName = subsubcategory?.subsubcategoryName;
-        } else {
-            delete productData.subsubcategoryId;
-            delete productData.subsubcategoryName;
+            productData.subsubcategoryName = subsubcategory?.subsubcategoryName || "";
         }
-
-
 
         const product = new Product(productData);
         await product.save();
@@ -248,7 +270,7 @@ exports.createProduct = async (req, res) => {
             const pTitle = productTitle || "New Product";
 
             await InAppNotification.create({
-                userId: "", // ✅ not empty now
+                userId: "",
                 notificationType: "PRODUCT_CREATED",
                 thumbnailTitle: "New product created",
                 notifyTo: "admin",
@@ -267,70 +289,19 @@ exports.createProduct = async (req, res) => {
             console.error("In-app notification save failed:", notiErr.message);
         }
 
-        return res.status(201).json({ success: true, data: product });
+        return res.status(201).json({
+            success: true,
+            message: "Product created successfully",
+            data: product,
+        });
     } catch (err) {
         console.error("Create Product Error:", err);
-        return res.status(500).json({ success: false, message: err.message });
+        return res.status(500).json({
+            success: false,
+            message: err.message || "Failed to create product",
+        });
     }
 };
-
-
-
-// exports.updateProductStatus = async (req, res) => {
-//     try {
-//         const { status } = req.body;
-
-//         const normalizedStatus =
-//             String(status || "").toLowerCase() === "active" ? "Active" : "Inactive";
-
-//         // ✅ update product
-//         const updatedProduct = await Product.findByIdAndUpdate(
-//             req.params.id,
-//             { status: normalizedStatus },
-//             { new: true }
-//         );
-
-//         if (!updatedProduct) {
-//             return res.status(404).json({ success: false, message: "Product not found" });
-//         }
-
-//         console.log("updatedProduct", updatedProduct);
-
-//         // ✅ convert vendorId string -> ObjectId safely
-//         let vendorObjectId = null;
-//         if (updatedProduct.vendorId && mongoose.Types.ObjectId.isValid(updatedProduct.vendorId)) {
-//             vendorObjectId = new mongoose.Types.ObjectId(updatedProduct.vendorId);
-//         }
-
-//         // ✅ find vendor/farmer
-//         const vendor = vendorObjectId ? await Farmer.findById(vendorObjectId) : null;
-
-//         // ✅ get token (change field name if yours differs)
-//         const fcmToken = vendor?.fcmToken;
-
-//         // ✅ send push
-//         const title = "Product Status Updated";
-//         const body =
-//             normalizedStatus === "Active"
-//                 ? `✅ Your product "${updatedProduct.productTitle}" is now Active.`
-//                 : `⏸️ Your product "${updatedProduct.productTitle}" is now Inactive.`;
-
-//         if (fcmToken) {
-//             await sendPushNotification(fcmToken, title, body);
-//         } else {
-//             console.log("No fcmToken for vendor:", updatedProduct.vendorId);
-//         }
-
-//         return res.status(200).json({
-//             success: true,
-//             message: "Status updated successfully",
-//             data: updatedProduct,
-//         });
-//     } catch (err) {
-//         console.log("updateProductStatus error:", err);
-//         return res.status(500).json({ success: false, message: err.message });
-//     }
-// };
 
 
 exports.updateProductStatus = async (req, res) => {
@@ -434,31 +405,142 @@ exports.getAllProducts = async (req, res) => {
 
 
 
+// exports.updateProduct = async (req, res) => {
+//     try {
+//         const updateData = { ...req.body };
+
+//         // ✅ existingImages from frontend (after deletions)
+//         let existingImages = [];
+//         try {
+//             if (req.body.existingImages) {
+//                 existingImages = JSON.parse(req.body.existingImages);
+//             }
+//         } catch (e) {
+//             existingImages = [];
+//         }
+
+//         const newImages = (req.files || []).map((f) => String(f.path).replace(/\\/g, "/"));
+
+//         updateData.productImages = [...existingImages, ...newImages];
+
+//         const updated = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true });
+//         return res.status(200).json({ success: true, data: updated });
+//     } catch (err) {
+//         return res.status(500).json({ success: false, message: err.message });
+//     }
+// };
+
 exports.updateProduct = async (req, res) => {
     try {
+        const { id } = req.params;
+
+        const existingProduct = await Product.findById(id);
+        if (!existingProduct) {
+            return res.status(404).json({
+                success: false,
+                message: "Product not found",
+            });
+        }
+
         const updateData = { ...req.body };
 
-        // ✅ existingImages from frontend (after deletions)
-        let existingImages = [];
+        // ✅ normalize status
+        if (req.body.status !== undefined) {
+            updateData.status =
+                String(req.body.status || "").toLowerCase() === "active"
+                    ? "Active"
+                    : "Inactive";
+        }
+
+        // ✅ parse existingImages from frontend
+        let existingImages = existingProduct.productImages || [];
         try {
             if (req.body.existingImages) {
                 existingImages = JSON.parse(req.body.existingImages);
+                if (!Array.isArray(existingImages)) {
+                    existingImages = existingProduct.productImages || [];
+                }
             }
-        } catch (e) {
-            existingImages = [];
+        } catch (error) {
+            existingImages = existingProduct.productImages || [];
         }
 
-        const newImages = (req.files || []).map((f) => String(f.path).replace(/\\/g, "/"));
+        // ✅ new uploaded images
+        const newImages = (req.files?.productImages || []).map((file) =>
+            String(file.path).replace(/\\/g, "/")
+        );
 
         updateData.productImages = [...existingImages, ...newImages];
 
-        const updated = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true });
-        return res.status(200).json({ success: true, data: updated });
+        // ✅ video update logic
+        const newVideo =
+            req.files?.productvideofile?.[0]?.path
+                ? String(req.files.productvideofile[0].path).replace(/\\/g, "/")
+                : null;
+
+        // if new video uploaded -> replace old video
+        // else if frontend sends existing video -> keep it
+        // else keep old DB video
+        if (newVideo) {
+            updateData.productvideofile = newVideo;
+        } else if (req.body.existingProductVideo !== undefined) {
+            updateData.productvideofile = req.body.existingProductVideo || "";
+        } else {
+            updateData.productvideofile = existingProduct.productvideofile || "";
+        }
+
+        // ✅ number safety
+        if (req.body.quantity !== undefined) {
+            const qtyNum = Number(req.body.quantity);
+            if (Number.isFinite(qtyNum) && qtyNum >= 0) {
+                updateData.quantity = qtyNum;
+            }
+        }
+
+        if (req.body.availableDate) {
+            updateData.availableDate = new Date(req.body.availableDate);
+        }
+
+        // ✅ category/subcategory names refresh if ids changed
+        if (updateData.categoryId) {
+            const category = await Category.findById(updateData.categoryId);
+            updateData.categoryName = category?.Categoryname || "";
+        }
+
+        if (updateData.subcategoryId) {
+            const subcategory = await Subcategory.findById(updateData.subcategoryId);
+            updateData.subcategoryName = subcategory?.subcategoryName || "";
+        }
+
+        if (
+            updateData.subsubcategoryId &&
+            String(updateData.subsubcategoryId).trim() !== ""
+        ) {
+            const subsubcategory = await Subsubcategory.findById(updateData.subsubcategoryId);
+            updateData.subsubcategoryName = subsubcategory?.subsubcategoryName || "";
+        } else if (updateData.subsubcategoryId === "" || updateData.subsubcategoryId === null) {
+            updateData.subsubcategoryId = undefined;
+            updateData.subsubcategoryName = undefined;
+        }
+
+        const updated = await Product.findByIdAndUpdate(id, updateData, {
+            new: true,
+            runValidators: true,
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Product updated successfully",
+            data: updated,
+        });
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message });
+        console.error("updateProduct error:", err);
+        return res.status(500).json({
+            success: false,
+            message: err.message || "Failed to update product",
+        });
     }
 };
-
 
 exports.deleteProduct = async (req, res) => {
     try {

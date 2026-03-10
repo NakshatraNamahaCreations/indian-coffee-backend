@@ -7,11 +7,7 @@ const Trader = require("../Modal/Trader");
 const { default: mongoose } = require("mongoose");
 const InAppNotification = require("../Modal/Notification")
 
-
 const safeId = (v) => (v ? String(v) : "");
-
-
-
 
 // exports.createBid = async (req, res) => {
 //     const session = await mongoose.startSession();

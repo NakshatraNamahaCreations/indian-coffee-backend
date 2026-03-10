@@ -76,7 +76,9 @@ const productSchema = new mongoose.Schema(
         sellingQuantity: { type: Number, default: 0, min: 0 },
         sellingDate: { type: Date, default: Date.now },
         bidActive: { type: Boolean, default: false },
-
+        productvideofile: {
+            type: String
+        },
         status: { type: String, enum: ["Active", "Inactive"], default: "Inactive" },
     },
     { timestamps: true }
