@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const traderSchema = new mongoose.Schema({
-    userType: { type: String, enum: ["individual", "company"] },
+    userType: { type: String, enum: ["individual", "company","FPO"] },
 
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
