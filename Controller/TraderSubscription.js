@@ -64,10 +64,12 @@ exports.createOrder = async (req, res) => {
 
     // Create Razorpay order
     const razorpay = getRazorpayClient();
+    // Generate short receipt (max 40 chars for Razorpay)
+    const shortReceipt = `sub_${Date.now().toString().slice(-8)}`;
     const order = await razorpay.orders.create({
       amount: plan.price * 100, // Convert to paise
       currency: "INR",
-      receipt: `sub_${traderId}_${planId}_${Date.now()}`,
+      receipt: shortReceipt,
     });
 
     if (!order || !order.id) {
