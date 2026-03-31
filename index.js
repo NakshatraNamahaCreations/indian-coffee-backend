@@ -47,6 +47,7 @@ const farmerbannerRoute = require("./Route/Farmerbanner");
 const notificationRoute = require("./Route/Notification");
 const planRoute = require("./Route/Plan");
 const couponRoute = require("./Route/Coupon");
+const traderSubscriptionRoute = require("./Route/TraderSubscription");
 const { startResetSellingCron } = require("./corn/resetSellingDaily");
 const deleteuserRoute = require("./Route/Deleteuser");
 
@@ -70,6 +71,7 @@ app.use("/api/farmerbanner", farmerbannerRoute);
 app.use("/api/notification", notificationRoute);
 app.use("/api/plan", planRoute);
 app.use("/api/coupon", couponRoute);
+app.use("/api/trader-subscription", traderSubscriptionRoute);
 app.use("/api/deleteuser", deleteuserRoute);
 
 

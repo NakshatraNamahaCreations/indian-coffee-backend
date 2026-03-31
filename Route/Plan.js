@@ -9,6 +9,7 @@ const {
     getPlanById,
     updatePlan,
     deletePlan,
+    getActivePlans,
 } = require("../Controller/Plan");
 
 
@@ -35,6 +36,7 @@ const upload = multer({
 
 router.post("/create", upload.single("planImage"), createPlan);
 router.get("/all", getPlans);
+router.get("/active", getActivePlans);
 router.get("/getbyid/:id", getPlanById);
 router.put("/update/:id", upload.single("planImage"), updatePlan);
 router.delete("/delete/:id", deletePlan);

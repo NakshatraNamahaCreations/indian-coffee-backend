@@ -12,6 +12,8 @@ const planSchema = new mongoose.Schema(
         price: { type: Number, default: 0 },
         durationDays: { type: Number, default: 30 },
 
+        planType: { type: String, enum: ["monthly", "six_months", "yearly", "custom"], default: "custom" },
+
         isActive: { type: Boolean, default: true },
     },
     { timestamps: true }

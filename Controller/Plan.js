@@ -111,3 +111,12 @@ exports.deletePlan = async (req, res) => {
         return res.status(500).json({ success: false, message: err.message });
     }
 };
+
+exports.getActivePlans = async (req, res) => {
+    try {
+        const plans = await Plan.find({ isActive: true }).sort({ price: 1 });
+        return res.json({ success: true, data: plans });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};

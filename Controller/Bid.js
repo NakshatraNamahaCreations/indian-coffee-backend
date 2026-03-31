@@ -180,6 +180,19 @@ exports.createBid = async (req, res) => {
                 ? String(bidType)
                 : "NORMAL";
 
+            // ✅ Check bidLimit before proceeding
+            const trader = await Trader.findById(userId).session(session);
+            if (!trader) {
+                throw { status: 404, message: "Trader not found" };
+            }
+            if (trader.bidLimit <= 0) {
+                throw {
+                    status: 403,
+                    message: "Your bid limit is 0. Please purchase a subscription plan to continue bidding.",
+                    code: "BID_LIMIT_EXHAUSTED"
+                };
+            }
+
             // ✅ Only validate product exists + Active
             const product = await Product.findById(productId).session(session);
             if (!product) {
@@ -215,6 +228,13 @@ exports.createBid = async (req, res) => {
             };
 
             const bid = await Bid.create([bidDoc], { session });
+
+            // ✅ Decrement bidLimit after successful bid creation
+            await Trader.findByIdAndUpdate(
+                userId,
+                { $inc: { bidLimit: -1 } },
+                { session }
+            );
 
             // ✅ Notify vendor (optional)
             const vendorId = product.vendorId;

@@ -45,6 +45,22 @@ exports.createProduct = async (req, res) => {
       });
     }
 
+    // ✅ Check bidLimit before allowing requirement creation
+    const trader = await Trader.findById(userId);
+    if (!trader) {
+      return res.status(404).json({
+        success: false,
+        message: "Trader not found",
+      });
+    }
+    if (trader.bidLimit <= 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Your bid limit is 0. Please purchase a subscription plan to add requirements.",
+        code: "BID_LIMIT_EXHAUSTED",
+      });
+    }
+
     let productImage = "";
     if (req.file) {
       productImage = `/uploads/products/${req.file.filename}`;
@@ -100,6 +116,9 @@ exports.createProduct = async (req, res) => {
       approvalStatus: "pending_admin",
       status: "Active",
     });
+
+    // ✅ Decrement bidLimit after successful requirement creation
+    await Trader.findByIdAndUpdate(userId, { $inc: { bidLimit: -1 } });
 
     return res.status(201).json({
       success: true,
