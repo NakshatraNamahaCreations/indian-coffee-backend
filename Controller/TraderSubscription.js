@@ -4,10 +4,18 @@ const TraderSubscription = require("../Modal/TraderSubscription");
 const Plan = require("../Modal/Plan");
 const Trader = require("../Modal/Trader");
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Initialize Razorpay client with env credentials
+const getRazorpayClient = () => {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    throw new Error(
+      "Razorpay credentials not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env"
+    );
+  }
+  return new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+};
 
 exports.createOrder = async (req, res) => {
   try {
@@ -17,6 +25,15 @@ exports.createOrder = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "traderId and planId are required",
+      });
+    }
+
+    // Verify Razorpay credentials are configured
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      console.error("❌ Razorpay credentials not configured in .env");
+      return res.status(500).json({
+        success: false,
+        message: "Payment service not configured. Contact admin.",
       });
     }
 
@@ -46,6 +63,7 @@ exports.createOrder = async (req, res) => {
     }
 
     // Create Razorpay order
+    const razorpay = getRazorpayClient();
     const order = await razorpay.orders.create({
       amount: plan.price * 100, // Convert to paise
       currency: "INR",
@@ -53,11 +71,14 @@ exports.createOrder = async (req, res) => {
     });
 
     if (!order || !order.id) {
+      console.error("❌ Razorpay order creation failed:", order);
       return res.status(500).json({
         success: false,
-        message: "Failed to create Razorpay order",
+        message: "Failed to create payment order. Please try again.",
       });
     }
+
+    console.log("✅ Razorpay order created:", order.id);
 
     // Create TraderSubscription record with pending status
     const subscription = await TraderSubscription.create({
@@ -79,10 +100,11 @@ exports.createOrder = async (req, res) => {
       subscriptionId: subscription._id,
     });
   } catch (err) {
-    console.error("Error in createOrder:", err);
+    console.error("❌ Error in createOrder:", err.message || err);
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message: err.message || "Failed to create payment order",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };

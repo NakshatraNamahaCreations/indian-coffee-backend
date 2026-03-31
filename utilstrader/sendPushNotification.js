@@ -1,4 +1,4 @@
-const admin = require("./firebasetrader");
+const admin = require("./firebaseTrader");
 
 const sendPushNotificationTrader = async (fcmToken, title, body) => {
     if (!fcmToken) return;
