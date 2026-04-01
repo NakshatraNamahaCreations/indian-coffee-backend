@@ -11,7 +11,7 @@ const deleteFile = (filePath) => {
 
 exports.createPlan = async (req, res) => {
     try {
-        const { planName, planDescription, count, subscriptionAdded, price, durationDays, isActive } = req.body;
+        const { planName, planDescription, count, subscriptionAdded, price, durationDays, isActive, planFor } = req.body;
 
         if (!planName) {
             return res.status(400).json({ success: false, message: "planName is required" });
@@ -28,6 +28,7 @@ exports.createPlan = async (req, res) => {
             durationDays: Number(durationDays || 30),
             isActive: isActive == null ? true : String(isActive) === "true",
             planImage,
+            planFor: planFor || "trader",
         });
 
         return res.status(201).json({ success: true, message: "Plan created", data: plan });
@@ -71,6 +72,7 @@ exports.updatePlan = async (req, res) => {
             price,
             durationDays,
             isActive,
+            planFor,
             removeImage,
         } = req.body;
 
@@ -89,6 +91,7 @@ exports.updatePlan = async (req, res) => {
         if (price != null) oldPlan.price = Number(price || 0);
         if (durationDays != null) oldPlan.durationDays = Number(durationDays || 30);
         if (isActive != null) oldPlan.isActive = String(isActive) === "true";
+        if (planFor != null) oldPlan.planFor = planFor;
 
         await oldPlan.save();
 
@@ -115,6 +118,15 @@ exports.deletePlan = async (req, res) => {
 exports.getActivePlans = async (req, res) => {
     try {
         const plans = await Plan.find({ isActive: true }).sort({ price: 1 });
+        return res.json({ success: true, data: plans });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.getActiveFarmerPlans = async (req, res) => {
+    try {
+        const plans = await Plan.find({ isActive: true, planFor: "farmer" }).sort({ price: 1 });
         return res.json({ success: true, data: plans });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });

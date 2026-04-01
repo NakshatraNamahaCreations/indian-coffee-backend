@@ -48,7 +48,9 @@ const notificationRoute = require("./Route/Notification");
 const planRoute = require("./Route/Plan");
 const couponRoute = require("./Route/Coupon");
 const traderSubscriptionRoute = require("./Route/TraderSubscription");
+const farmerSubscriptionRoute = require("./Route/FarmerSubscription");
 const { startResetSellingCron } = require("./corn/resetSellingDaily");
+const { startResetMonthlyListingsCron } = require("./corn/resetMonthlyListings");
 const deleteuserRoute = require("./Route/Deleteuser");
 
 app.use("/api", adminRoute);
@@ -72,10 +74,12 @@ app.use("/api/notification", notificationRoute);
 app.use("/api/plan", planRoute);
 app.use("/api/coupon", couponRoute);
 app.use("/api/trader-subscription", traderSubscriptionRoute);
+app.use("/api/farmer-subscription", farmerSubscriptionRoute);
 app.use("/api/deleteuser", deleteuserRoute);
 
 
 startResetSellingCron();
+startResetMonthlyListingsCron();
 
 const PORT = process.env.PORT || 8000;
 require("./corn/unlockProduct");

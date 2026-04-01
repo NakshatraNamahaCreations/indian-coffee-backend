@@ -122,6 +122,7 @@ router.get("/products/search", controller.searchProducts);
 
 router.get("/featured", controller.getFeaturedProducts);
 router.put("/:id/featured-toggle", controller.toggleFeatureProduct);
+router.post("/:id/feature", controller.featureProduct);
 
 router.put("/:id/upload-product-file", uploadSingleProductFile, controller.uploadProductFile);
 

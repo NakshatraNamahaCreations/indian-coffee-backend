@@ -31,6 +31,26 @@ const farmerSchema = new mongoose.Schema({
     registrationDocs: [String],
 
     bidLimit: { type: Number, default: 5 },
+
+    // Subscription tracking
+    currentPlanId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Plan",
+        default: null,
+    },
+    currentPlanName: {
+        type: String,
+        default: null,
+    },
+    monthlyListingCount: {
+        type: Number,
+        default: 0,
+    },
+    featuredListingCount: {
+        type: Number,
+        default: 0,
+    },
+
     status: { type: String, default: "Inactive" },
     fcmToken: {
         type: String,

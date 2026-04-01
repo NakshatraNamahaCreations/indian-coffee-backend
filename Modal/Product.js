@@ -80,6 +80,9 @@ const productSchema = new mongoose.Schema(
             type: String
         },
         status: { type: String, enum: ["Active", "Inactive"], default: "Inactive" },
+
+        isFeatured: { type: Boolean, default: false },
+        featuredAt: { type: Date, default: null },
     },
     { timestamps: true }
 );

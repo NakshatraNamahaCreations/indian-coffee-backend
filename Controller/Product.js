@@ -262,6 +262,37 @@ exports.createProduct = async (req, res) => {
             productData.subsubcategoryName = subsubcategory?.subsubcategoryName || "";
         }
 
+        // ---- Farmer listing limit enforcement ----
+        if (vendorId) {
+            const farmer = await Farmer.findById(vendorId).select("currentPlanName monthlyListingCount");
+            if (farmer) {
+                const isPro = farmer.currentPlanName &&
+                    farmer.currentPlanName.toLowerCase().includes("pro");
+                const hasActivePlan = !!farmer.currentPlanName;
+
+                if (!hasActivePlan) {
+                    // No subscription — use legacy default (5 listings)
+                    const existingListings = await Product.countDocuments({ vendorId: String(vendorId) });
+                    if (existingListings >= 5) {
+                        return res.status(403).json({
+                            success: false,
+                            message: "You have reached the free listing limit. Please subscribe to a plan.",
+                        });
+                    }
+                } else if (!isPro) {
+                    // Basic plan — 5 listings/month
+                    if (farmer.monthlyListingCount >= 5) {
+                        return res.status(403).json({
+                            success: false,
+                            message: "Monthly listing limit reached. Upgrade to Pro for unlimited listings.",
+                        });
+                    }
+                }
+                // Pro plan — no limit, falls through
+            }
+        }
+        // ---- End listing limit enforcement ----
+
         const product = new Product(productData);
         await product.save();
 
@@ -287,6 +318,18 @@ exports.createProduct = async (req, res) => {
             });
         } catch (notiErr) {
             console.error("In-app notification save failed:", notiErr.message);
+        }
+
+        // Increment monthly listing count for non-Pro farmers
+        if (vendorId) {
+            const farmer = await Farmer.findById(vendorId).select("currentPlanName");
+            if (farmer) {
+                const isPro = farmer.currentPlanName &&
+                    farmer.currentPlanName.toLowerCase().includes("pro");
+                if (!isPro) {
+                    await Farmer.findByIdAndUpdate(vendorId, { $inc: { monthlyListingCount: 1 } });
+                }
+            }
         }
 
         return res.status(201).json({
@@ -870,7 +913,10 @@ exports.toggleFeatureProduct = async (req, res) => {
 exports.getFeaturedProducts = async (req, res) => {
     try {
         const products = await Product.find({
-            fetureProduct: true,
+            $or: [
+                { isFeatured: true },   // New field for farmer subscription featured products
+                { fetureProduct: true }  // Legacy field for backward compatibility
+            ],
             status: "Active",
         }).sort({ createdAt: -1 });
 
@@ -1064,6 +1110,75 @@ exports.updateProductBidActive = async (req, res) => {
 //     }
 // };
 
+
+exports.featureProduct = async (req, res) => {
+    try {
+        const { productId, farmerId } = req.body;
+
+        if (!productId || !farmerId) {
+            return res.status(400).json({
+                success: false,
+                message: "productId and farmerId are required",
+            });
+        }
+
+        // Fetch product
+        const product = await Product.findOne({
+            _id: productId,
+            vendorId: String(farmerId),
+        });
+
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                message: "Product not found for this farmer",
+            });
+        }
+
+        // Fetch farmer and validate Pro plan + feature count
+        const farmer = await Farmer.findById(farmerId).select("currentPlanName featuredListingCount");
+        if (!farmer) {
+            return res.status(404).json({
+                success: false,
+                message: "Farmer not found",
+            });
+        }
+
+        const isPro = farmer.currentPlanName &&
+            farmer.currentPlanName.toLowerCase().includes("pro");
+
+        if (!isPro) {
+            return res.status(403).json({
+                success: false,
+                message: "Only Pro plan members can feature products",
+            });
+        }
+
+        if (farmer.featuredListingCount >= 1) {
+            return res.status(403).json({
+                success: false,
+                message: "You have reached your featured listing limit for this month",
+            });
+        }
+
+        // Mark product as featured
+        product.isFeatured = true;
+        product.featuredAt = new Date();
+        await product.save();
+
+        // Increment featured count
+        await Farmer.findByIdAndUpdate(farmerId, { $inc: { featuredListingCount: 1 } });
+
+        return res.status(200).json({
+            success: true,
+            message: "Product marked as featured",
+            data: product,
+        });
+    } catch (err) {
+        console.log("featureProduct error:", err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+};
 
 // exports.updateProductBidActive = async (req, res) => {
 //     try {

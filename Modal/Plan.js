@@ -15,6 +15,8 @@ const planSchema = new mongoose.Schema(
         planType: { type: String, enum: ["monthly", "six_months", "yearly", "custom"], default: "custom" },
 
         isActive: { type: Boolean, default: true },
+
+        planFor: { type: String, enum: ["trader", "farmer"], default: "trader" },
     },
     { timestamps: true }
 );
