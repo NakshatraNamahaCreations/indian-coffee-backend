@@ -104,6 +104,7 @@ exports.createOrder = async (req, res) => {
       planName: plan.planName,
       amount: plan.price,
       listingCount: plan.count,
+      countResetType: plan.countResetType,
       razorpayOrderId: order.id,
       status: "pending",
     });
@@ -189,8 +190,9 @@ exports.verifyPayment = async (req, res) => {
       {
         currentPlanId: subscription.planId,
         currentPlanName: plan.planName,
-        monthlyListingCount: 0,
-        featuredListingCount: 0,
+        countBalance: plan.count,
+        monthlyCountUsed: 0,
+        countResetType: plan.countResetType,
       },
       { new: true }
     );
@@ -250,7 +252,7 @@ exports.getCurrentSubscription = async (req, res) => {
     }
 
     const farmer = await Farmer.findById(farmerId).select(
-      "currentPlanName monthlyListingCount userType"
+      "currentPlanName countBalance countResetType monthlyCountUsed userType"
     );
     if (!farmer) {
       return res.status(404).json({
@@ -266,7 +268,9 @@ exports.getCurrentSubscription = async (req, res) => {
     return res.json({
       success: true,
       currentPlanName: farmer.currentPlanName,
-      monthlyListingCount: farmer.monthlyListingCount,
+      countBalance: farmer.countBalance,
+      countResetType: farmer.countResetType,
+      monthlyCountUsed: farmer.monthlyCountUsed,
       userType: farmer.userType,
       subscription: activeSub || null,
     });

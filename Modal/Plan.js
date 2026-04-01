@@ -9,6 +9,8 @@ const planSchema = new mongoose.Schema(
         count: { type: Number, default: 0 },
         subscriptionAdded: { type: Boolean, default: false },
 
+        countResetType: { type: String, enum: ["one-time", "monthly"], default: "one-time" },
+
         price: { type: Number, default: 0 },
         durationDays: { type: Number, default: 30 },
 

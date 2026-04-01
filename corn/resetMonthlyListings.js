@@ -6,15 +6,14 @@ function startResetMonthlyListingsCron() {
         "0 0 1 * *",   // At 00:00 on day-of-month 1
         async () => {
             try {
-                await Farmer.updateMany({}, {
-                    $set: {
-                        monthlyListingCount: 0,
-                        featuredListingCount: 0
-                    }
-                });
-                console.log("✅ Monthly listing count reset for all farmers");
+                // Reset monthlyCountUsed for farmers with "monthly" reset type plans
+                await Farmer.updateMany(
+                    { countResetType: "monthly" },
+                    { $set: { monthlyCountUsed: 0 } }
+                );
+                console.log("✅ Monthly count used reset for farmers with monthly plan type");
             } catch (err) {
-                console.log("❌ Monthly listing reset error:", err);
+                console.log("❌ Monthly count reset error:", err);
             }
         },
         { timezone: "Asia/Kolkata" }

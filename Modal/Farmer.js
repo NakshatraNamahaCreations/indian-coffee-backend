@@ -42,13 +42,18 @@ const farmerSchema = new mongoose.Schema({
         type: String,
         default: null,
     },
-    monthlyListingCount: {
+    countBalance: {
         type: Number,
         default: 0,
     },
-    featuredListingCount: {
+    monthlyCountUsed: {
         type: Number,
         default: 0,
+    },
+    countResetType: {
+        type: String,
+        enum: ["one-time", "monthly"],
+        default: "one-time",
     },
 
     status: { type: String, default: "Inactive" },

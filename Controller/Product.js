@@ -262,36 +262,21 @@ exports.createProduct = async (req, res) => {
             productData.subsubcategoryName = subsubcategory?.subsubcategoryName || "";
         }
 
-        // ---- Farmer listing limit enforcement ----
+        // ---- Farmer count limit enforcement ----
         if (vendorId) {
-            const farmer = await Farmer.findById(vendorId).select("currentPlanName monthlyListingCount");
-            if (farmer) {
-                const isPro = farmer.currentPlanName &&
-                    farmer.currentPlanName.toLowerCase().includes("pro");
-                const hasActivePlan = !!farmer.currentPlanName;
-
-                if (!hasActivePlan) {
-                    // No subscription — use legacy default (5 listings)
-                    const existingListings = await Product.countDocuments({ vendorId: String(vendorId) });
-                    if (existingListings >= 5) {
-                        return res.status(403).json({
-                            success: false,
-                            message: "You have reached the free listing limit. Please subscribe to a plan.",
-                        });
-                    }
-                } else if (!isPro) {
-                    // Basic plan — 5 listings/month
-                    if (farmer.monthlyListingCount >= 5) {
-                        return res.status(403).json({
-                            success: false,
-                            message: "Monthly listing limit reached. Upgrade to Pro for unlimited listings.",
-                        });
-                    }
+            const farmer = await Farmer.findById(vendorId).select("currentPlanName countBalance countResetType");
+            if (farmer && farmer.currentPlanName) {
+                // Has an active subscription
+                if (farmer.countBalance <= 0) {
+                    return res.status(403).json({
+                        success: false,
+                        code: "COUNT_LIMIT_EXHAUSTED",
+                        message: "You have exhausted your posting counts. Please purchase a plan.",
+                    });
                 }
-                // Pro plan — no limit, falls through
             }
         }
-        // ---- End listing limit enforcement ----
+        // ---- End count limit enforcement ----
 
         const product = new Product(productData);
         await product.save();
@@ -320,14 +305,16 @@ exports.createProduct = async (req, res) => {
             console.error("In-app notification save failed:", notiErr.message);
         }
 
-        // Increment monthly listing count for non-Pro farmers
+        // Deduct 1 count for posting a product (for farmers with active subscription)
         if (vendorId) {
-            const farmer = await Farmer.findById(vendorId).select("currentPlanName");
-            if (farmer) {
-                const isPro = farmer.currentPlanName &&
-                    farmer.currentPlanName.toLowerCase().includes("pro");
-                if (!isPro) {
-                    await Farmer.findByIdAndUpdate(vendorId, { $inc: { monthlyListingCount: 1 } });
+            const farmer = await Farmer.findById(vendorId).select("currentPlanName countResetType");
+            if (farmer && farmer.currentPlanName) {
+                // Has active subscription, deduct 1 count
+                await Farmer.findByIdAndUpdate(vendorId, { $inc: { countBalance: -1 } });
+
+                // For monthly reset plans, also track usage
+                if (farmer.countResetType === "monthly") {
+                    await Farmer.findByIdAndUpdate(vendorId, { $inc: { monthlyCountUsed: 1 } });
                 }
             }
         }
