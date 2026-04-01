@@ -20,14 +20,9 @@ const farmerSubscriptionSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    listingCount: {
+    bidLimitCount: {
       type: Number,
       required: true,
-    },
-    countResetType: {
-      type: String,
-      enum: ["one-time", "monthly"],
-      default: "one-time",
     },
     startDate: {
       type: Date,

@@ -262,21 +262,18 @@ exports.createProduct = async (req, res) => {
             productData.subsubcategoryName = subsubcategory?.subsubcategoryName || "";
         }
 
-        // ---- Farmer count limit enforcement ----
+        // ---- Farmer bid limit enforcement (for posting listings) ----
         if (vendorId) {
-            const farmer = await Farmer.findById(vendorId).select("currentPlanName countBalance countResetType");
-            if (farmer && farmer.currentPlanName) {
-                // Has an active subscription
-                if (farmer.countBalance <= 0) {
-                    return res.status(403).json({
-                        success: false,
-                        code: "COUNT_LIMIT_EXHAUSTED",
-                        message: "You have exhausted your posting counts. Please purchase a plan.",
-                    });
-                }
+            const farmer = await Farmer.findById(vendorId).select("bidLimit currentPlanName");
+            if (farmer && farmer.bidLimit <= 0) {
+                return res.status(403).json({
+                    success: false,
+                    code: "BID_LIMIT_EXHAUSTED",
+                    message: "You have exhausted your bid limit. Please upgrade your subscription plan.",
+                });
             }
         }
-        // ---- End count limit enforcement ----
+        // ---- End bid limit enforcement ----
 
         const product = new Product(productData);
         await product.save();
@@ -305,18 +302,9 @@ exports.createProduct = async (req, res) => {
             console.error("In-app notification save failed:", notiErr.message);
         }
 
-        // Deduct 1 count for posting a product (for farmers with active subscription)
+        // Decrement bidLimit for posting a product
         if (vendorId) {
-            const farmer = await Farmer.findById(vendorId).select("currentPlanName countResetType");
-            if (farmer && farmer.currentPlanName) {
-                // Has active subscription, deduct 1 count
-                await Farmer.findByIdAndUpdate(vendorId, { $inc: { countBalance: -1 } });
-
-                // For monthly reset plans, also track usage
-                if (farmer.countResetType === "monthly") {
-                    await Farmer.findByIdAndUpdate(vendorId, { $inc: { monthlyCountUsed: 1 } });
-                }
-            }
+            await Farmer.findByIdAndUpdate(vendorId, { $inc: { bidLimit: -1 } });
         }
 
         return res.status(201).json({

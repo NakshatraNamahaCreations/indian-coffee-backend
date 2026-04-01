@@ -30,7 +30,7 @@ const farmerSchema = new mongoose.Schema({
     gstImage: String,
     registrationDocs: [String],
 
-    bidLimit: { type: Number, default: 5 },
+    bidLimit: { type: Number, default: 0 },
 
     // Subscription tracking
     currentPlanId: {
@@ -42,18 +42,17 @@ const farmerSchema = new mongoose.Schema({
         type: String,
         default: null,
     },
-    countBalance: {
+    planDurationDays: {
         type: Number,
-        default: 0,
+        default: null,
     },
-    monthlyCountUsed: {
-        type: Number,
-        default: 0,
+    subscriptionStartDate: {
+        type: Date,
+        default: null,
     },
-    countResetType: {
-        type: String,
-        enum: ["one-time", "monthly"],
-        default: "one-time",
+    subscriptionEndDate: {
+        type: Date,
+        default: null,
     },
 
     status: { type: String, default: "Inactive" },

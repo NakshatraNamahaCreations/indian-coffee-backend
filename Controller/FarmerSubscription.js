@@ -103,8 +103,7 @@ exports.createOrder = async (req, res) => {
       planId,
       planName: plan.planName,
       amount: plan.price,
-      listingCount: plan.count,
-      countResetType: plan.countResetType,
+      bidLimitCount: plan.count,
       razorpayOrderId: order.id,
       status: "pending",
     });
@@ -184,15 +183,20 @@ exports.verifyPayment = async (req, res) => {
     subscription.endDate = endDate;
     await subscription.save();
 
-    // Update farmer's subscription fields
+    // Update farmer's bid limit and subscription info
+    const subscriptionStartDate = new Date();
+    const subscriptionEndDate = new Date();
+    subscriptionEndDate.setDate(subscriptionEndDate.getDate() + (plan.durationDays || 365));
+
     const farmer = await Farmer.findByIdAndUpdate(
       farmerId,
       {
         currentPlanId: subscription.planId,
         currentPlanName: plan.planName,
-        countBalance: plan.count,
-        monthlyCountUsed: 0,
-        countResetType: plan.countResetType,
+        bidLimit: plan.count,
+        planDurationDays: plan.durationDays || 365,
+        subscriptionStartDate,
+        subscriptionEndDate,
       },
       { new: true }
     );
@@ -252,7 +256,7 @@ exports.getCurrentSubscription = async (req, res) => {
     }
 
     const farmer = await Farmer.findById(farmerId).select(
-      "currentPlanName countBalance countResetType monthlyCountUsed userType"
+      "currentPlanName bidLimit subscriptionStartDate subscriptionEndDate userType"
     );
     if (!farmer) {
       return res.status(404).json({
@@ -268,9 +272,9 @@ exports.getCurrentSubscription = async (req, res) => {
     return res.json({
       success: true,
       currentPlanName: farmer.currentPlanName,
-      countBalance: farmer.countBalance,
-      countResetType: farmer.countResetType,
-      monthlyCountUsed: farmer.monthlyCountUsed,
+      bidLimit: farmer.bidLimit || 0,
+      subscriptionStartDate: farmer.subscriptionStartDate,
+      subscriptionEndDate: farmer.subscriptionEndDate,
       userType: farmer.userType,
       subscription: activeSub || null,
     });

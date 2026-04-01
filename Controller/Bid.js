@@ -387,17 +387,9 @@ exports.vendorAcceptBid = async (req, res) => {
 
         const product = await Product.findById(bid.productId).select("vendorId").lean();
 
-        // Deduct 1 count for farmer accepting a bid (if they have active subscription)
+        // Decrement farmer's bidLimit when accepting a bid
         if (product?.vendorId) {
-            const farmer = await Farmer.findById(product.vendorId).select("currentPlanName countResetType");
-            if (farmer && farmer.currentPlanName && farmer.countBalance > 0) {
-                await Farmer.findByIdAndUpdate(product.vendorId, { $inc: { countBalance: -1 } });
-
-                // For monthly reset plans, also track usage
-                if (farmer.countResetType === "monthly") {
-                    await Farmer.findByIdAndUpdate(product.vendorId, { $inc: { monthlyCountUsed: 1 } });
-                }
-            }
+            await Farmer.findByIdAndUpdate(product.vendorId, { $inc: { bidLimit: -1 } });
         }
 
         try {
