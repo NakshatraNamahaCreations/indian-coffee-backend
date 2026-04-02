@@ -52,7 +52,7 @@ const farmerSubscriptionRoute = require("./Route/FarmerSubscription");
 const { startResetSellingCron } = require("./corn/resetSellingDaily");
 const { startResetMonthlyListingsCron } = require("./corn/resetMonthlyListings");
 const deleteuserRoute = require("./Route/Deleteuser");
-
+// tyui
 app.use("/api", adminRoute);
 app.use("/api", categoryRoute);
 app.use("/api", VendorRoute);
