@@ -17,6 +17,8 @@ const planSchema = new mongoose.Schema(
         isActive: { type: Boolean, default: true },
 
         planFor: { type: String, enum: ["trader", "farmer"], default: "trader" },
+
+        userType: { type: String, enum: ["Individual", "Company", "FPO", "All"], default: "All" },
     },
     { timestamps: true }
 );
