@@ -11,6 +11,7 @@ const {
     deletePlan,
     getActivePlans,
     getActiveFarmerPlans,
+    getActiveTraderPlans,
 } = require("../Controller/Plan");
 
 
@@ -39,6 +40,7 @@ router.post("/create", upload.single("planImage"), createPlan);
 router.get("/all", getPlans);
 router.get("/active", getActivePlans);
 router.get("/active-farmer", getActiveFarmerPlans);
+router.get("/active-trader", getActiveTraderPlans);
 router.get("/getbyid/:id", getPlanById);
 router.put("/update/:id", upload.single("planImage"), updatePlan);
 router.delete("/delete/:id", deletePlan);
