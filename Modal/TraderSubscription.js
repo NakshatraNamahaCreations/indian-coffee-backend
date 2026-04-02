@@ -14,27 +14,20 @@ const traderSubscriptionSchema = new mongoose.Schema(
     },
     planName: {
       type: String,
-      default: "",
+      required: true,
     },
     amount: {
       type: Number,
-      default: 0,
+      required: true,
     },
     bidCount: {
       type: Number,
       required: true,
-    },
-    startDate: {
-      type: Date,
-      default: Date.now,
-    },
-    endDate: {
-      type: Date,
+      description: "Number of bid credits from this plan",
     },
     razorpayOrderId: {
       type: String,
       required: true,
-      unique: true,
     },
     razorpayPaymentId: {
       type: String,
@@ -46,8 +39,16 @@ const traderSubscriptionSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "active", "expired", "cancelled"],
+      enum: ["pending", "completed", "failed"],
       default: "pending",
+    },
+    durationDays: {
+      type: Number,
+      default: 30,
+    },
+    expiresAt: {
+      type: Date,
+      default: null,
     },
   },
   { timestamps: true }

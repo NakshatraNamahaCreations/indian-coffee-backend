@@ -2,13 +2,24 @@ const router = require("express").Router();
 const {
   createOrder,
   verifyPayment,
-  getSubscriptionHistory,
   getBidLimit,
+  getSubscriptionHistory,
 } = require("../Controller/TraderSubscription");
 
+/**
+ * Subscription Management Routes
+ */
+
+// Create Razorpay order
 router.post("/create-order", createOrder);
+
+// Verify payment and update bid limit
 router.post("/verify-payment", verifyPayment);
-router.get("/history/:traderId", getSubscriptionHistory);
+
+// Get trader's current bid limit
 router.get("/bid-limit/:traderId", getBidLimit);
+
+// Get trader's subscription history
+router.get("/history/:traderId", getSubscriptionHistory);
 
 module.exports = router;
