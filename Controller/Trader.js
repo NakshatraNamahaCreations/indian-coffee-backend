@@ -5,6 +5,10 @@ const Otp = require("../Modal/Otp");
 const sendOtpSms = require("../utils/sendOtpSms");
 const sendPushNotification = require("../utilstrader/sendPushNotification");
 const InAppNotification = require("../Modal/Notification");
+const Bid = require("../Modal/Bid");
+const Favurite = require("../Modal/Favurite");
+const TraderSubscription = require("../Modal/TraderSubscription");
+const Addrequirement = require("../Modal/Addrequirement");
 
 const isValidIndian10Digit = (m = "") => /^[6-9]\d{9}$/.test(String(m).trim());
 
@@ -139,6 +143,14 @@ exports.register = async (req, res) => {
             });
         }
 
+        const existMobile = await Trader.findOne({ mobileNumber });
+        if (existMobile) {
+            return res.status(400).json({
+                success: false,
+                error: "Mobile number already exists"
+            });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
         const files = req.files || {};
 
@@ -223,6 +235,14 @@ exports.register1 = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "Email already exists",
+            });
+        }
+
+        const existMobile = await Trader.findOne({ mobileNumber });
+        if (existMobile) {
+            return res.status(400).json({
+                success: false,
+                message: "Mobile number already exists",
             });
         }
 
@@ -670,5 +690,37 @@ exports.saveFcmToken = async (req, res) => {
             success: false,
             message: "Failed to save FCM token",
         });
+    }
+};
+
+exports.deleteAccount = async (req, res) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) {
+            return res.status(400).json({ success: false, message: "userId is required" });
+        }
+
+        const trader = await Trader.findById(userId);
+        if (!trader) {
+            return res.status(404).json({ success: false, message: "Account not found" });
+        }
+
+        const uid = trader._id.toString();
+
+        // Cascade delete all related data
+        await Promise.all([
+            Bid.deleteMany({ userId: uid }),
+            Favurite.deleteMany({ userId: uid }),
+            TraderSubscription.deleteMany({ traderId: trader._id }),
+            Addrequirement.deleteMany({ userId: trader._id }),
+        ]);
+
+        // Delete the trader account
+        await Trader.findByIdAndDelete(userId);
+
+        res.json({ success: true, message: "Account deleted successfully" });
+    } catch (err) {
+        console.error("Delete Account Error:", err);
+        res.status(500).json({ success: false, message: "Failed to delete account" });
     }
 };

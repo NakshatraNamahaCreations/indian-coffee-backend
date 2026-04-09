@@ -42,6 +42,7 @@ router.post("/change-password", ctrl.changePassword);
 router.post("/trader/login/send-otp", ctrl.sendLoginOtp);
 router.post("/trader/login/verify-otp", ctrl.verifyOtpAndLogin);
 router.post("/trader/save-fcm-token", ctrl.saveFcmToken);
+router.post("/trader/delete-account", ctrl.deleteAccount);
 
 module.exports = router;
 

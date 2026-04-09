@@ -4,6 +4,8 @@ const Otp = require("../Modal/Otp");
 const sendOtpSms = require("../utils/sendOtpSms");
 const sendPushNotification = require("../utils/sendPushNotification");
 const InAppNotification = require("../Modal/Notification");
+const Product = require("../Modal/Product");
+const FarmerSubscription = require("../Modal/FarmerSubscription");
 
 
 exports.register = async (req, res) => {
@@ -46,7 +48,7 @@ exports.register = async (req, res) => {
         if (existingmobileNumberUser) {
             return res.status(400).json({
                 success: false,
-                message: "mobileNumber already exists",
+                message: "Mobile number already exists",
             });
         }
 
@@ -557,5 +559,35 @@ exports.saveFcmToken = async (req, res) => {
             success: false,
             message: "Failed to save FCM token",
         });
+    }
+};
+
+exports.deleteAccount = async (req, res) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) {
+            return res.status(400).json({ success: false, message: "userId is required" });
+        }
+
+        const farmer = await Farmer.findById(userId);
+        if (!farmer) {
+            return res.status(404).json({ success: false, message: "Account not found" });
+        }
+
+        const uid = farmer._id.toString();
+
+        // Cascade delete all related data
+        await Promise.all([
+            Product.deleteMany({ vendorId: uid }),
+            FarmerSubscription.deleteMany({ farmerId: farmer._id }),
+        ]);
+
+        // Delete the farmer account
+        await Farmer.findByIdAndDelete(userId);
+
+        res.json({ success: true, message: "Account deleted successfully" });
+    } catch (err) {
+        console.error("Delete Account Error:", err);
+        res.status(500).json({ success: false, message: "Failed to delete account" });
     }
 };

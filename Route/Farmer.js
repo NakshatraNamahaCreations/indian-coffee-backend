@@ -44,5 +44,6 @@ router.post("/change-password", farmerController.changePassword);
 router.post("/login/send-otp", farmerController.sendLoginOtp);
 router.post("/login/verify-otp", farmerController.verifyOtpAndLogin);
 router.post("/save-fcm-token", farmerController.saveFcmToken);
+router.post("/delete-account", farmerController.deleteAccount);
 
 module.exports = router;
