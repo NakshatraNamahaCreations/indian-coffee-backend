@@ -707,7 +707,6 @@ exports.deleteAccount = async (req, res) => {
 
         const uid = trader._id.toString();
 
-        // Cascade delete all related data
         await Promise.all([
             Bid.deleteMany({ userId: uid }),
             Favurite.deleteMany({ userId: uid }),
