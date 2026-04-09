@@ -1268,30 +1268,37 @@ exports.adminrejectBid = async (req, res) => {
         bid.status = "rejected";
         await bid.save({ session });
 
-        // ✅ Restore sellingQuantity:
-        // If product sellingQuantity already > 0, keep it.
-        // Else restore using bidQty (because user bid EXACT sellingQuantity in your rule).
-        const currentSellingQty = Number(existingProduct.sellingQuantity || 0);
-        const restoreSellingQty = currentSellingQty > 0 ? currentSellingQty : bidQty;
+        // ✅ Only restore inventory if bid was previously approved
+        // If bid was pending and directly rejected, inventory was never decremented, so don't restore
+        const shouldRestoreInventory = String(prevStatus) === "admin_approved";
+
+        const updateObj = {
+            $set: {
+                isLocked: false,
+                lockedBy: null,
+                lockExpiresAt: null,
+            },
+        };
+
+        // Only increment inventory if the bid was admin_approved
+        if (shouldRestoreInventory) {
+            updateObj.$inc = { availableQuantity: bidQty };
+            const currentSellingQty = Number(existingProduct.sellingQuantity || 0);
+            updateObj.$set.sellingQuantity = currentSellingQty > 0 ? currentSellingQty : bidQty;
+        } else {
+            // If bid was never approved, just reset sellingQuantity to 0
+            updateObj.$set.sellingQuantity = 0;
+        }
 
         const product = await Product.findByIdAndUpdate(
             bid.productId,
-            {
-                $inc: { availableQuantity: bidQty }, // keep your existing rollback
-                $set: {
-                    isLocked: false,
-                    lockedBy: null,
-                    lockExpiresAt: null,
-                    sellingQuantity: restoreSellingQty, // ✅ IMPORTANT
-                },
-            },
+            updateObj,
             { new: true, session }
         );
 
         await session.commitTransaction();
         session.endSession();
 
-        // ✅ Notifications (keep yours)
         try {
             if (bid.userId) {
                 const trader = await Trader.findById(bid.userId).lean();
