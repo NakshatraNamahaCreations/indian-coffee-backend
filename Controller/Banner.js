@@ -130,7 +130,7 @@ function safeUnlink(filePath) {
 // ✅ CREATE
 exports.createBanner = async (req, res) => {
     try {
-        const { title, description } = req.body;
+        const { title, description, videoUrl } = req.body;
 
         // ✅ If image is required, keep this. Otherwise remove it.
         if (!req.file) {
@@ -144,6 +144,7 @@ exports.createBanner = async (req, res) => {
             title: title || "",
             description: description || "",
             imageUrl: `/uploads/banners/${req.file.filename}`,
+            videoUrl: videoUrl || "",
             status: "inactive",
         });
 
@@ -175,6 +176,7 @@ exports.updateBanner = async (req, res) => {
 
         if (typeof req.body.title !== "undefined") banner.title = req.body.title;
         if (typeof req.body.description !== "undefined") banner.description = req.body.description;
+        if (typeof req.body.videoUrl !== "undefined") banner.videoUrl = req.body.videoUrl;
 
         if (req.file) {
             // ✅ delete old image

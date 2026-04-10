@@ -6,12 +6,13 @@ const Banner = require("../Modal/Farmerbanner");
 // ✅ CREATE
 exports.createBanner = async (req, res) => {
     try {
-        const { title, description } = req.body;
+        const { title, description, videoUrl } = req.body;
 
         const banner = new Banner({
             title,
             description,
             imageUrl: req.file ? `/uploads/banners/${req.file.filename}` : undefined,
+            videoUrl: videoUrl || "",
             status: "inactive",
         });
 
@@ -44,6 +45,7 @@ exports.updateBanner = async (req, res) => {
         // update fields
         if (typeof req.body.title !== "undefined") banner.title = req.body.title;
         if (typeof req.body.description !== "undefined") banner.description = req.body.description;
+        if (typeof req.body.videoUrl !== "undefined") banner.videoUrl = req.body.videoUrl;
 
         // if new file uploaded => delete old file + save new path
         if (req.file) {
