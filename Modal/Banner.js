@@ -4,6 +4,7 @@ let BannerSchema = new mongoose.Schema({
     title: { type: String, required: true },
     description: { type: String },
     imageUrl: { type: String },
+    videoUrl: { type: String },
     status: { type: String, enum: ['active', 'inactive'], default: 'inactive' },
 }, { timestamps: true });
 
