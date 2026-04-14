@@ -3,34 +3,22 @@ const Category = require("../Modal/Category");
 exports.createCategory = async (req, res) => {
     try {
         const { Categoryname } = req.body;
+        // With Cloudinary, req.file.path is the full CDN URL
         const Categoryimage = req.file ? req.file.path : "";
 
-        const category = new Category({
-            Categoryname,
-            Categoryimage
-        });
-
+        const category = new Category({ Categoryname, Categoryimage });
         await category.save();
 
-        res.status(201).json({
-            success: true,
-            data: category
-        });
+        res.status(201).json({ success: true, data: category });
     } catch (err) {
-        res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        res.status(500).json({ success: false, message: err.message });
     }
 };
 
 exports.getAllCategory = async (req, res) => {
     try {
         const categories = await Category.find();
-        res.status(200).json({
-            success: true,
-            data: categories
-        });
+        res.status(200).json({ success: true, data: categories });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -39,7 +27,7 @@ exports.getAllCategory = async (req, res) => {
 exports.updateCategory = async (req, res) => {
     try {
         const { Categoryname } = req.body;
-        let updateData = { Categoryname };
+        const updateData = { Categoryname };
 
         if (req.file) {
             updateData.Categoryimage = req.file.path;

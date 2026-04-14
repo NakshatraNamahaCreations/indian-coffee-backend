@@ -5,7 +5,6 @@ const cors = require("cors");
 const morgan = require("morgan");
 require("dotenv").config();
 const cookieParser = require("cookie-parser");
-const path = require("path");
 
 mongoose
     .connect(process.env.MONGO_URI, {
@@ -19,7 +18,7 @@ mongoose
 
 
 app.use(cors());
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+// Media files are now served via Cloudinary CDN — local /uploads static serving removed
 
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());

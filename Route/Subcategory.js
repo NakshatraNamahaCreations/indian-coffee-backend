@@ -1,22 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { createUploader } = require("../utils/cloudinaryConfig");
 const subcategoryController = require("../Controller/Subcategory");
 
-const uploadDir = path.join(process.cwd(), "uploads/subcategory");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        cb(null, `subcategory-${Date.now()}${ext}`);
-    },
-});
-
-const upload = multer({ storage });
+const upload = createUploader("indian_coffee/subcategories");
 
 router.post("/createsubcategory", upload.single("subcategoryImage"), subcategoryController.createSubcategory);
 router.get("/getallsubcategory", subcategoryController.getAllSubcategories);

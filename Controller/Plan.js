@@ -1,13 +1,5 @@
-const fs = require("fs");
 const Plan = require("../Modal/Plan");
-
-const deleteFile = (filePath) => {
-    if (!filePath) return;
-    try {
-        const p = filePath.startsWith("/") ? filePath.slice(1) : filePath;
-        if (fs.existsSync(p)) fs.unlinkSync(p);
-    } catch (_) {}
-};
+const { deleteFromCloudinary } = require("../utils/cloudinaryConfig");
 
 exports.createPlan = async (req, res) => {
     try {
@@ -17,7 +9,8 @@ exports.createPlan = async (req, res) => {
             return res.status(400).json({ success: false, message: "planName is required" });
         }
 
-        const planImage = req.file ? `/${req.file.path.replace(/\\/g, "/")}` : "";
+        // With Cloudinary, req.file.path is the full CDN URL
+        const planImage = req.file ? req.file.path : "";
 
         const plan = await Plan.create({
             planName,
@@ -78,10 +71,10 @@ exports.updatePlan = async (req, res) => {
         } = req.body;
 
         if (req.file) {
-            deleteFile(oldPlan.planImage);
-            oldPlan.planImage = `/${req.file.path.replace(/\\/g, "/")}`;
+            await deleteFromCloudinary(oldPlan.planImage, "image");
+            oldPlan.planImage = req.file.path;
         } else if (String(removeImage) === "true") {
-            deleteFile(oldPlan.planImage);
+            await deleteFromCloudinary(oldPlan.planImage, "image");
             oldPlan.planImage = "";
         }
 
@@ -108,7 +101,7 @@ exports.deletePlan = async (req, res) => {
         const plan = await Plan.findById(req.params.id);
         if (!plan) return res.status(404).json({ success: false, message: "Plan not found" });
 
-        deleteFile(plan.planImage);
+        await deleteFromCloudinary(plan.planImage, "image");
         await Plan.deleteOne({ _id: plan._id });
 
         return res.json({ success: true, message: "Plan deleted" });

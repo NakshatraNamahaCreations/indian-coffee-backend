@@ -3,55 +3,46 @@ const Category = require("../Modal/Category");
 
 exports.createSubcategory = async (req, res) => {
     try {
-        let { categoryId, subcategoryName } = req.body;
+        const { categoryId, subcategoryName } = req.body;
 
-        let category = await Category.findById(categoryId);
+        const category = await Category.findById(categoryId);
         if (!category) {
             return res.status(404).json({ success: false, message: "Category not found" });
         }
 
-        let imagePath = "";
-        if (req.file) {
-            imagePath = req.file.path.replace(/\\/g, "/");
-        }
+        // With Cloudinary, req.file.path is the full CDN URL — no path normalization needed
+        const subcategoryImage = req.file ? req.file.path : "";
 
-        let subcategory = new Subcategory({
+        const subcategory = new Subcategory({
             categoryId,
             categoryName: category.Categoryname,
             subcategoryName,
-            subcategoryImage: imagePath
+            subcategoryImage,
         });
 
         await subcategory.save();
-
         res.status(201).json({ success: true, data: subcategory });
-
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 };
 
-
 exports.getAllSubcategories = async (req, res) => {
     try {
-        let data = await Subcategory.find().sort({ createdAt: -1 });
+        const data = await Subcategory.find().sort({ createdAt: -1 });
         res.status(200).json({ success: true, data });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 };
 
-
 exports.updateSubcategory = async (req, res) => {
     try {
-        let { categoryId, subcategoryName } = req.body;
-
-        let updateData = {
-            subcategoryName
-        };
+        const { categoryId, subcategoryName } = req.body;
+        const updateData = { subcategoryName };
 
         if (categoryId) {
-            let category = await Category.findById(categoryId);
+            const category = await Category.findById(categoryId);
             if (category) {
                 updateData.categoryId = categoryId;
                 updateData.categoryName = category.Categoryname;
@@ -59,22 +50,20 @@ exports.updateSubcategory = async (req, res) => {
         }
 
         if (req.file) {
-            updateData.subcategoryImage = req.file.path.replace(/\\/g, "/");
+            updateData.subcategoryImage = req.file.path;
         }
 
-        let data = await Subcategory.findByIdAndUpdate(
+        const data = await Subcategory.findByIdAndUpdate(
             req.params.id,
             updateData,
             { new: true }
         );
 
         res.status(200).json({ success: true, data });
-
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
 };
-
 
 exports.deleteSubcategory = async (req, res) => {
     try {
@@ -85,30 +74,16 @@ exports.deleteSubcategory = async (req, res) => {
     }
 };
 
-
 exports.getSubcategoriesByCategory = async (req, res) => {
     try {
         const { categoryId } = req.params;
-
         if (!categoryId) {
-            return res.status(400).json({
-                success: false,
-                message: "Category ID is required"
-            });
+            return res.status(400).json({ success: false, message: "Category ID is required" });
         }
 
-        const subcategories = await Subcategory.find({ categoryId })
-            .sort({ createdAt: -1 });
-
-        res.status(200).json({
-            success: true,
-            data: subcategories
-        });
-
+        const subcategories = await Subcategory.find({ categoryId }).sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data: subcategories });
     } catch (err) {
-        res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        res.status(500).json({ success: false, message: err.message });
     }
 };

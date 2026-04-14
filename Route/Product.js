@@ -1,33 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { createProductUploader } = require("../utils/cloudinaryConfig");
 const controller = require("../Controller/Product");
 
-// Ensure upload directories exist
-["uploads/products", "uploads/videos", "uploads/files"].forEach((dir) => {
-    const full = path.join(process.cwd(), dir);
-    if (!fs.existsSync(full)) fs.mkdirSync(full, { recursive: true });
-});
-
-const storage = multer.diskStorage({
-    destination: (_req, file, cb) => {
-        if (file.fieldname === "productvideofile") {
-            cb(null, path.join(process.cwd(), "uploads/videos"));
-        } else if (file.fieldname === "productFile") {
-            cb(null, path.join(process.cwd(), "uploads/files"));
-        } else {
-            cb(null, path.join(process.cwd(), "uploads/products"));
-        }
-    },
-    filename: (_req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        cb(null, `${file.fieldname}-${Date.now()}${ext}`);
-    },
-});
-
-const upload = multer({ storage, limits: { fileSize: 200 * 1024 * 1024 } });
+const upload = createProductUploader("indian_coffee/products");
 
 const uploadImagesAndVideo = upload.fields([
     { name: "productImages",    maxCount: 7 },

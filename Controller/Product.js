@@ -197,15 +197,10 @@ exports.createProduct = async (req, res) => {
         const normalizedStatus =
             String(status || "").toLowerCase() === "active" ? "Active" : "Inactive";
 
-        // ✅ handle multer.fields()
-        const productImages = (req.files?.productImages || []).map((file) =>
-            String(file.path).replace(/\\/g, "/")
-        );
+        // With Cloudinary, file.path is the full CDN URL
+        const productImages = (req.files?.productImages || []).map((file) => file.path);
 
-        const productvideofile =
-            req.files?.productvideofile?.[0]?.path
-                ? String(req.files.productvideofile[0].path).replace(/\\/g, "/")
-                : "";
+        const productvideofile = req.files?.productvideofile?.[0]?.path || "";
 
         const category = categoryId ? await Category.findById(categoryId) : null;
         const subcategory = subcategoryId ? await Subcategory.findById(subcategoryId) : null;
@@ -483,18 +478,13 @@ exports.updateProduct = async (req, res) => {
             existingImages = existingProduct.productImages || [];
         }
 
-        // ✅ new uploaded images
-        const newImages = (req.files?.productImages || []).map((file) =>
-            String(file.path).replace(/\\/g, "/")
-        );
+        // With Cloudinary, file.path is the full CDN URL
+        const newImages = (req.files?.productImages || []).map((file) => file.path);
 
         updateData.productImages = [...existingImages, ...newImages];
 
         // ✅ video update logic
-        const newVideo =
-            req.files?.productvideofile?.[0]?.path
-                ? String(req.files.productvideofile[0].path).replace(/\\/g, "/")
-                : null;
+        const newVideo = req.files?.productvideofile?.[0]?.path || null;
 
         // if new video uploaded -> replace old video
         // else if frontend sends existing video -> keep it

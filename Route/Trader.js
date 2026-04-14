@@ -1,22 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { createUploader } = require("../utils/cloudinaryConfig");
 const ctrl = require("../Controller/Trader");
 
-const uploadDir = path.join(process.cwd(), "uploads/kyc");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        cb(null, `${file.fieldname}-${Date.now()}${ext}`);
-    },
-});
-
-const upload = multer({ storage });
+// KYC docs can be images or PDFs — use "auto" to handle both
+const upload = createUploader("indian_coffee/kyc", "auto");
 
 const cpUpload = upload.fields([
     { name: "aadhaarFront",     maxCount: 1 },

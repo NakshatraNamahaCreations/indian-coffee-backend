@@ -326,23 +326,19 @@ exports.edit = async (req, res) => {
             bidLimit: parseInt(bidLimit)
         };
 
+        const { deleteFromCloudinary } = require("../utils/cloudinaryConfig");
+
         if (userType === 'individual') {
             updateData.firstName = firstName;
             updateData.lastName = lastName;
 
             if (files.aadhaarFront?.[0]) {
-                if (oldTrader.aadhaarFront) {
-                    const oldPath = path.join(__dirname, '..', oldTrader.aadhaarFront);
-                    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-                }
-                updateData.aadhaarFront = `/uploads/${files.aadhaarFront[0].filename}`;
+                await deleteFromCloudinary(oldTrader.aadhaarFront, "auto");
+                updateData.aadhaarFront = files.aadhaarFront[0].path;
             }
             if (files.aadhaarBack?.[0]) {
-                if (oldTrader.aadhaarBack) {
-                    const oldPath = path.join(__dirname, '..', oldTrader.aadhaarBack);
-                    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-                }
-                updateData.aadhaarBack = `/uploads/${files.aadhaarBack[0].filename}`;
+                await deleteFromCloudinary(oldTrader.aadhaarBack, "auto");
+                updateData.aadhaarBack = files.aadhaarBack[0].path;
             }
 
             updateData.businessName = undefined;
@@ -358,25 +354,18 @@ exports.edit = async (req, res) => {
             updateData.gstNumber = gstNumber;
 
             if (files.panImage?.[0]) {
-                if (oldTrader.panImage) {
-                    const oldPath = path.join(__dirname, '..', oldTrader.panImage);
-                    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-                }
-                updateData.panImage = `/uploads/${files.panImage[0].filename}`;
+                await deleteFromCloudinary(oldTrader.panImage, "auto");
+                updateData.panImage = files.panImage[0].path;
             }
             if (files.gstImage?.[0]) {
-                if (oldTrader.gstImage) {
-                    const oldPath = path.join(__dirname, '..', oldTrader.gstImage);
-                    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-                }
-                updateData.gstImage = `/uploads/${files.gstImage[0].filename}`;
+                await deleteFromCloudinary(oldTrader.gstImage, "auto");
+                updateData.gstImage = files.gstImage[0].path;
             }
             if (files.registrationDocs?.length) {
-                (oldTrader.registrationDocs || []).forEach(docPath => {
-                    const oldPath = path.join(__dirname, '..', docPath);
-                    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-                });
-                updateData.registrationDocs = files.registrationDocs.map(f => `/uploads/${f.filename}`);
+                for (const docUrl of (oldTrader.registrationDocs || [])) {
+                    await deleteFromCloudinary(docUrl, "auto");
+                }
+                updateData.registrationDocs = files.registrationDocs.map(f => f.path);
             }
 
             updateData.firstName = undefined;

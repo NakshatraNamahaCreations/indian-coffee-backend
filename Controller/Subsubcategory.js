@@ -6,20 +6,18 @@ exports.createSubSubcategory = async (req, res) => {
     try {
         const { categoryId, subcategoryId, subsubcategoryName } = req.body;
 
-        let category = await Category.findById(categoryId);
+        const category = await Category.findById(categoryId);
         if (!category) {
             return res.status(404).json({ success: false, message: "Category not found" });
         }
 
-        let subcategory = await Subcategory.findById(subcategoryId);
+        const subcategory = await Subcategory.findById(subcategoryId);
         if (!subcategory) {
             return res.status(404).json({ success: false, message: "Subcategory not found" });
         }
 
-        let imagePath = "";
-        if (req.file) {
-            imagePath = req.file.path.replace(/\\/g, "/");
-        }
+        // With Cloudinary, req.file.path is the full CDN URL
+        const subsubcategoryImage = req.file ? req.file.path : "";
 
         const newSubSub = new SubSubcategory({
             categoryId,
@@ -27,13 +25,11 @@ exports.createSubSubcategory = async (req, res) => {
             subcategoryId,
             subcategoryName: subcategory.subcategoryName,
             subsubcategoryName,
-            subsubcategoryImage: imagePath
+            subsubcategoryImage,
         });
 
         await newSubSub.save();
-
         res.status(201).json({ success: true, data: newSubSub });
-
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -57,26 +53,22 @@ exports.updateSubSubcategory = async (req, res) => {
             return res.status(404).json({ success: false, message: "Not found" });
         }
 
-        let imagePath = subSub.subsubcategoryImage;
+        // Keep existing image unless a new one is uploaded
         if (req.file) {
-            imagePath = req.file.path.replace(/\\/g, "/");
+            subSub.subsubcategoryImage = req.file.path;
         }
 
-        // Fetch category + subcategory names
-        let category = await Category.findById(categoryId);
-        let subcategory = await Subcategory.findById(subcategoryId);
+        const category = await Category.findById(categoryId);
+        const subcategory = await Subcategory.findById(subcategoryId);
 
         subSub.categoryId = categoryId;
         subSub.categoryName = category.Categoryname;
         subSub.subcategoryId = subcategoryId;
         subSub.subcategoryName = subcategory.subcategoryName;
         subSub.subsubcategoryName = subsubcategoryName;
-        subSub.subsubcategoryImage = imagePath;
 
         await subSub.save();
-
         res.json({ success: true, data: subSub });
-
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -85,13 +77,10 @@ exports.updateSubSubcategory = async (req, res) => {
 exports.deleteSubSubcategory = async (req, res) => {
     try {
         const deleted = await SubSubcategory.findByIdAndDelete(req.params.id);
-
         if (!deleted) {
             return res.status(404).json({ success: false, message: "Not found" });
         }
-
         res.json({ success: true, message: "Deleted successfully" });
-
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
@@ -100,26 +89,13 @@ exports.deleteSubSubcategory = async (req, res) => {
 exports.getSubSubcategoriesBySubcategory = async (req, res) => {
     try {
         const { subcategoryId } = req.params;
-
         if (!subcategoryId) {
-            return res.status(400).json({
-                success: false,
-                message: "Subcategory ID is required"
-            });
+            return res.status(400).json({ success: false, message: "Subcategory ID is required" });
         }
 
-        const data = await SubSubcategory.find({ subcategoryId })
-            .sort({ createdAt: -1 });
-
-        res.status(200).json({
-            success: true,
-            data
-        });
-
+        const data = await SubSubcategory.find({ subcategoryId }).sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data });
     } catch (err) {
-        res.status(500).json({
-            success: false,
-            message: err.message
-        });
+        res.status(500).json({ success: false, message: err.message });
     }
 };
