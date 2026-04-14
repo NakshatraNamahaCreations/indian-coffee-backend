@@ -1,80 +1,73 @@
+/**
+ * cloudinaryConfig.js
+ * -------------------
+ * Central Cloudinary setup for the entire backend.
+ * Every upload route imports from here — only one place to update credentials.
+ *
+ * HOW TO SET CREDENTIALS (Render):
+ *   Dashboard → your service → Environment → Add the three variables below.
+ *   Then click "Manual Deploy" so the new env vars take effect.
+ *
+ *   CLOUDINARY_CLOUD_NAME   → your cloud name from cloudinary.com/console
+ *   CLOUDINARY_API_KEY      → your API key
+ *   CLOUDINARY_API_SECRET   → your API secret  ← most common source of errors
+ */
+
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const multer = require("multer");
 
-// Configure cloudinary once — driven entirely by env vars
+// ─── Configure Cloudinary once ───────────────────────────────────────────────
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key:    process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// ✅ Debug logging with detailed information
-console.log("\n📦 Cloudinary Configuration Status:");
-console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-console.log("Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME ? `✓ ${process.env.CLOUDINARY_CLOUD_NAME}` : "✗ NOT SET");
-console.log("API Key:", process.env.CLOUDINARY_API_KEY ? "✓ SET" : "✗ NOT SET");
-console.log("API Secret:", process.env.CLOUDINARY_API_SECRET ? "✓ SET" : "✗ NOT SET");
-console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
-if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-    console.error("❌ CRITICAL: Cloudinary environment variables are not fully configured!");
-    console.error("Please ensure these environment variables are set on Render:");
-    console.error("  - CLOUDINARY_CLOUD_NAME");
-    console.error("  - CLOUDINARY_API_KEY");
-    console.error("  - CLOUDINARY_API_SECRET");
+// ─── Startup check ───────────────────────────────────────────────────────────
+const { cloud_name, api_key, api_secret } = cloudinary.config();
+if (!cloud_name || !api_key || !api_secret) {
+    console.error("=".repeat(60));
+    console.error("❌  CLOUDINARY NOT CONFIGURED");
+    console.error("    Missing env vars on Render:");
+    if (!cloud_name) console.error("    • CLOUDINARY_CLOUD_NAME");
+    if (!api_key)    console.error("    • CLOUDINARY_API_KEY");
+    if (!api_secret) console.error("    • CLOUDINARY_API_SECRET");
+    console.error("    Go to Render → your service → Environment → add them,");
+    console.error("    then click Manual Deploy.");
+    console.error("=".repeat(60));
 } else {
-    console.log("✅ Cloudinary is fully configured and ready for use");
+    console.log(`✅  Cloudinary ready  (cloud: ${cloud_name})`);
 }
 
+// ─── Factory ─────────────────────────────────────────────────────────────────
 /**
- * Creates a multer instance backed by Cloudinary storage.
+ * Creates a multer middleware that uploads directly to Cloudinary.
  *
- * @param {string}   folder         - Cloudinary folder name (e.g. "banners", "products")
- * @param {string}   resourceType   - "image" | "video" | "raw" | "auto"
- * @param {string[]} [allowedFormats] - e.g. ["jpg","png","webp"]. Omit to allow all for that resource type.
- * @param {number}   [fileSizeBytes]  - multer fileSize limit in bytes. Defaults to 50 MB.
- * @returns {multer.Multer}
+ * @param {string}    folder          Cloudinary folder, e.g. "banners"
+ * @param {string}    resourceType    "image" | "video" | "raw" | "auto"
+ * @param {string[]}  [allowedFormats]  e.g. ["jpg","jpeg","png","webp"]
+ * @param {number}    [maxSizeBytes]  defaults to 50 MB
+ * @returns multer instance — use it like: upload.single("fieldName")
  */
-function createCloudinaryUploader(
+function createUploader(
     folder,
-    resourceType = "image",
-    allowedFormats = undefined,
-    fileSizeBytes = 50 * 1024 * 1024
+    resourceType    = "image",
+    allowedFormats  = undefined,
+    maxSizeBytes    = 50 * 1024 * 1024
 ) {
-    const paramsConfig = {
-        folder,
-        resource_type: resourceType,
-    };
+    const params = { folder, resource_type: resourceType };
     if (allowedFormats && allowedFormats.length > 0) {
-        paramsConfig.allowed_formats = allowedFormats;
+        params.allowed_formats = allowedFormats;
     }
 
     const storage = new CloudinaryStorage({
         cloudinary,
-        params: async (req, file) => paramsConfig,  // ✅ Use async function
+        // async function is required by multer-storage-cloudinary v4+
+        params: async (req, file) => params,
     });
 
-    return multer({
-        storage,
-        limits: { fileSize: fileSizeBytes },
-    });
+    return multer({ storage, limits: { fileSize: maxSizeBytes } });
 }
 
-/**
- * Extract Cloudinary public_id from a full URL.
- * URL pattern: https://res.cloudinary.com/<cloud>/image/upload/v<ver>/<folder>/<publicId>.<ext>
- * Returns e.g. "banners/banner-1234567890" (no extension).
- */
-function extractPublicId(url) {
-    if (!url || !url.includes("cloudinary.com")) return null;
-    // Strip query params, split on "/upload/", take the part after version segment
-    const afterUpload = url.split("/upload/")[1];
-    if (!afterUpload) return null;
-    // Remove version segment if present (v1234567890/)
-    const withoutVersion = afterUpload.replace(/^v\d+\//, "");
-    // Remove extension
-    return withoutVersion.replace(/\.[^/.]+$/, "");
-}
-
-module.exports = { cloudinary, createCloudinaryUploader, extractPublicId };
+module.exports = { cloudinary, createUploader };

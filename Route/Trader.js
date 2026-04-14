@@ -2,19 +2,16 @@
 const express = require("express");
 const router = express.Router();
 const ctrl = require("../Controller/Trader");
-const { createCloudinaryUploader } = require("../utils/cloudinaryConfig");
+const { createUploader } = require("../utils/cloudinaryConfig");
 
-// ✅ Cloudinary-backed multer uploader
-const upload = createCloudinaryUploader(
-    "kyc/trader",  // folder
-    "image"        // resource_type
-);
+// KYC documents for traders stored in Cloudinary folder "kyc/traders"
+const upload = createUploader("kyc/traders", "image");
 
 const cpUpload = upload.fields([
-    { name: "aadhaarFront", maxCount: 1 },
-    { name: "aadhaarBack", maxCount: 1 },
-    { name: "panImage", maxCount: 1 },
-    { name: "gstImage", maxCount: 1 },
+    { name: "aadhaarFront",    maxCount: 1 },
+    { name: "aadhaarBack",     maxCount: 1 },
+    { name: "panImage",        maxCount: 1 },
+    { name: "gstImage",        maxCount: 1 },
     { name: "registrationDocs", maxCount: 10 },
 ]);
 

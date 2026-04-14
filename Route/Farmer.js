@@ -1,19 +1,16 @@
 const express = require("express");
 const router = express.Router();
 const farmerController = require("../Controller/Farmer");
-const { createCloudinaryUploader } = require("../utils/cloudinaryConfig");
+const { createUploader } = require("../utils/cloudinaryConfig");
 
-// ✅ Cloudinary-backed multer uploader
-const upload = createCloudinaryUploader(
-    "kyc/farmer",  // folder
-    "image"        // resource_type
-);
+// KYC documents for farmers stored in Cloudinary folder "kyc/farmers"
+const upload = createUploader("kyc/farmers", "image");
 
 const uploadFields = upload.fields([
-    { name: "aadhaarFront", maxCount: 1 },
-    { name: "aadhaarBack", maxCount: 1 },
-    { name: "panImage", maxCount: 1 },
-    { name: "gstImage", maxCount: 1 },
+    { name: "aadhaarFront",    maxCount: 1 },
+    { name: "aadhaarBack",     maxCount: 1 },
+    { name: "panImage",        maxCount: 1 },
+    { name: "gstImage",        maxCount: 1 },
     { name: "registrationDocs", maxCount: 5 },
 ]);
 

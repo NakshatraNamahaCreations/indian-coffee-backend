@@ -7,6 +7,9 @@ require("dotenv").config();
 const cookieParser = require("cookie-parser");
 const path = require("path");
 
+// Load Cloudinary config at startup so the env-var check runs immediately
+require("./utils/cloudinaryConfig");
+
 mongoose
     .connect(process.env.MONGO_URI, {
         // useNewUrlParser: true,
@@ -87,76 +90,32 @@ app.get("/test", (req, res) => {
     res.status(200).json({ message: "Welcome to Suman Back end" });
 });
 
-// ✅ Diagnostic endpoint to verify Cloudinary configuration
-app.get("/api/cloudinary-health", (req, res) => {
-    const { cloudinary } = require("./utils/cloudinaryConfig");
-    const config = cloudinary.config();
-
-    const isConfigured = !!(
-        config.cloud_name &&
-        config.api_key &&
-        config.api_secret
-    );
-
-    return res.status(200).json({
-        success: true,
-        cloudinary_configured: isConfigured,
-        cloud_name: config.cloud_name || "NOT SET",
-        api_key: config.api_key ? "***SET***" : "NOT SET",
-        api_secret: config.api_secret ? "***SET***" : "NOT SET",
-        env_vars: {
-            CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || "NOT SET",
-            CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? "***SET***" : "NOT SET",
-            CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? "***SET***" : "NOT SET",
-        }
-    });
-});
-
-// ✅ ERROR HANDLING MIDDLEWARE (must be last)
+// ─── Global error handler (must be last) ─────────────────────────────────────
 app.use((err, req, res, next) => {
-    console.error("\n❌ ERROR CAUGHT:");
-    console.error("Message:", err.message);
-    console.error("Name:", err.name);
-    console.error("Code:", err.code);
-    if (err.stack) console.error("Stack:", err.stack.split("\n").slice(0, 3).join("\n"));
-    console.log("");
+    console.error("❌ Error:", err.message);
 
-    // Multer errors
+    // File-size exceeded
+    if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ success: false, message: "File is too large." });
+    }
+
+    // Any multer error
     if (err.name === "MulterError") {
-        console.error("📤 Multer File Upload Error:", err.code);
-        return res.status(400).json({
-            success: false,
-            error_type: "MULTER_ERROR",
-            error_code: err.code,
-            message: `Upload error: ${err.message}`,
-        });
+        return res.status(400).json({ success: false, message: `Upload error: ${err.message}` });
     }
 
-    // Cloudinary signature/authentication errors
+    // Cloudinary "Invalid Signature" → credentials mismatch on Render
     if (err.message && err.message.includes("Invalid Signature")) {
-        console.error("🔐 Cloudinary Signature Error - Check credentials on Render!");
-        return res.status(401).json({
+        console.error("🔑  Cloudinary signature mismatch — check CLOUDINARY_API_SECRET on Render and redeploy.");
+        return res.status(500).json({
             success: false,
-            error_type: "CLOUDINARY_SIGNATURE_ERROR",
-            message: "Cloudinary credentials mismatch. Verify API_SECRET matches Cloudinary account and restart service on Render.",
-            debug: err.message,
+            message: "Image upload failed: server credentials are misconfigured. Please contact support.",
         });
     }
 
-    // Other Cloudinary errors
-    if (err.message && err.message.includes("Cloudinary")) {
-        console.error("☁️  Cloudinary Error");
-        return res.status(400).json({
-            success: false,
-            error_type: "CLOUDINARY_ERROR",
-            message: `Cloudinary error: ${err.message}`,
-        });
-    }
-
-    // Generic errors
+    // Everything else
     return res.status(err.status || 500).json({
         success: false,
-        error_type: "GENERIC_ERROR",
         message: err.message || "Internal server error",
     });
 });

@@ -63,9 +63,7 @@ exports.createProduct = async (req, res) => {
 
     let productImage = "";
     if (req.file) {
-      // ✅ req.file.path is already a Cloudinary URL
-      productImage = req.file.path;
-      console.log("✅ Product image uploaded to Cloudinary:", productImage);
+      productImage = req.file.path; // Cloudinary CDN URL
     }
 
     const [category, subcategory, weightUnit] = await Promise.all([

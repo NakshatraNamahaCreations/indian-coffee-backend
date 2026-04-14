@@ -16,17 +16,16 @@
 
 const express = require("express");
 const router = express.Router();
-const { createCloudinaryUploader } = require("../utils/cloudinaryConfig");
 const bannerController = require("../Controller/Farmerbanner");
+const { createUploader } = require("../utils/cloudinaryConfig");
 
-// ✅ Cloudinary-backed multer uploader
-const upload = createCloudinaryUploader(
-    "banners",                      // folder (same as main banners)
-    "image",                        // resource_type
-    ["jpg", "jpeg", "png", "webp"], // allowed formats
-    10 * 1024 * 1024                // 10MB limit
+// Uploads to Cloudinary folder "farmer-banners", images only, max 10 MB
+const upload = createUploader(
+    "farmer-banners",
+    "image",
+    ["jpg", "jpeg", "png", "webp"],
+    10 * 1024 * 1024
 );
-
 
 router.post("/createbanner", upload.single("image"), bannerController.createBanner);
 router.get("/getallbanner", bannerController.getAllBanners);

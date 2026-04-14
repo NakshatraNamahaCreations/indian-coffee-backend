@@ -1,15 +1,15 @@
 // Route/Addrequirement.js
 const express = require("express");
 const router = express.Router();
-const { createCloudinaryUploader } = require("../utils/cloudinaryConfig");
 const RequirementController = require("../Controller/Addrequirement");
+const { createUploader } = require("../utils/cloudinaryConfig");
 
-// ✅ Cloudinary-backed multer uploader
-const uploadProductImage = createCloudinaryUploader(
-    "requirements",                 // folder
-    "image",                        // resource_type
-    ["jpg", "jpeg", "png", "webp"], // allowed formats
-    5 * 1024 * 1024                 // 5MB limit
+// Uploads to Cloudinary folder "requirements", images only, max 5 MB
+const uploadProductImage = createUploader(
+    "requirements",
+    "image",
+    ["jpg", "jpeg", "png", "webp"],
+    5 * 1024 * 1024
 );
 
 router.post("/createrequirement", uploadProductImage.single("productImage"), RequirementController.createProduct);

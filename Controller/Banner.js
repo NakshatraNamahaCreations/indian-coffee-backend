@@ -117,47 +117,29 @@
 
 
 // Controller/Banner.js
-const fs = require("fs");
-const path = require("path");
 const Banner = require("../Modal/Banner");
 
-function safeUnlink(filePath) {
-    try {
-        if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    } catch (e) { }
-}
-
-// ✅ CREATE
+// CREATE — imageUrl comes directly from Cloudinary (req.file.path = CDN URL)
 exports.createBanner = async (req, res) => {
     try {
         const { title, description, videoUrl } = req.body;
 
-        // ✅ If image is required, keep this. Otherwise remove it.
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: "Banner image is required. Field name must be 'image'.",
-            });
-        }
-
         const banner = new Banner({
-            title: title || "",
+            title:       title || "",
             description: description || "",
-            imageUrl: req.file.path,  // ✅ Cloudinary URL
-            videoUrl: videoUrl || "",
-            status: "inactive",
+            imageUrl:    req.file ? req.file.path : undefined, // Cloudinary CDN URL
+            videoUrl:    videoUrl || "",
+            status:      "inactive",
         });
 
         await banner.save();
-
         return res.status(201).json({ success: true, data: banner });
     } catch (err) {
-        console.error("❌ createBanner error:", err);  // ✅ Log error for debugging
         return res.status(500).json({ success: false, message: err.message });
     }
 };
 
-// ✅ GET ALL
+// GET ALL
 exports.getAllBanners = async (req, res) => {
     try {
         const banners = await Banner.find().sort({ createdAt: -1 });
@@ -167,22 +149,18 @@ exports.getAllBanners = async (req, res) => {
     }
 };
 
-// ✅ UPDATE (title/description + optionally replace image)
+// UPDATE — if a new image is uploaded, replace the stored URL
 exports.updateBanner = async (req, res) => {
     try {
         const banner = await Banner.findById(req.params.id);
-        if (!banner) {
-            return res.status(404).json({ success: false, message: "Banner not found" });
-        }
+        if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
 
-        if (typeof req.body.title !== "undefined") banner.title = req.body.title;
-        if (typeof req.body.description !== "undefined") banner.description = req.body.description;
-        if (typeof req.body.videoUrl !== "undefined") banner.videoUrl = req.body.videoUrl;
+        if (req.body.title       !== undefined) banner.title       = req.body.title;
+        if (req.body.description !== undefined) banner.description = req.body.description;
+        if (req.body.videoUrl    !== undefined) banner.videoUrl    = req.body.videoUrl;
 
-        if (req.file) {
-            // ✅ File is now on Cloudinary — no local deletion needed
-            banner.imageUrl = req.file.path;  // ✅ Cloudinary URL
-        }
+        // New image uploaded → save the new Cloudinary URL (old image stays on Cloudinary)
+        if (req.file) banner.imageUrl = req.file.path;
 
         await banner.save();
         return res.status(200).json({ success: true, data: banner });
@@ -191,37 +169,31 @@ exports.updateBanner = async (req, res) => {
     }
 };
 
-// ✅ DELETE (file is on Cloudinary — no local deletion needed)
+// DELETE — remove DB record (image stays on Cloudinary unless you call cloudinary.uploader.destroy)
 exports.deleteBanner = async (req, res) => {
     try {
         const banner = await Banner.findById(req.params.id);
-        if (!banner) {
-            return res.status(404).json({ success: false, message: "Banner not found" });
-        }
+        if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
 
-        // ✅ File deletion is handled by Cloudinary — just remove the DB record
         await Banner.findByIdAndDelete(req.params.id);
-
         return res.status(200).json({ success: true, message: "Banner deleted" });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
     }
 };
 
-// ✅ TOGGLE STATUS
+// TOGGLE STATUS
 exports.updateStatus = async (req, res) => {
     try {
         const banner = await Banner.findById(req.params.id);
-        if (!banner) {
-            return res.status(404).json({ success: false, message: "Banner not found" });
-        }
+        if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
 
         banner.status = banner.status === "active" ? "inactive" : "active";
         await banner.save();
 
         return res.status(200).json({
             success: true,
-            data: banner,
+            data:    banner,
             message: `Status changed to ${banner.status}`,
         });
     } catch (err) {
@@ -229,7 +201,7 @@ exports.updateStatus = async (req, res) => {
     }
 };
 
-// ✅ ACTIVE ONLY
+// ACTIVE ONLY
 exports.getActiveBanners = async (req, res) => {
     try {
         const banners = await Banner.find({ status: "active" }).sort({ createdAt: -1 });

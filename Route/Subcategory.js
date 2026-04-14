@@ -1,13 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const { createCloudinaryUploader } = require("../utils/cloudinaryConfig");
 const subcategoryController = require("../Controller/Subcategory");
+const { createUploader } = require("../utils/cloudinaryConfig");
 
-// ✅ Cloudinary-backed multer uploader
-const upload = createCloudinaryUploader(
-    "subcategory",  // folder
-    "image"         // resource_type
-);
+// Uploads to Cloudinary folder "subcategories"
+const upload = createUploader("subcategories", "image");
 
 router.post(
     "/createsubcategory",

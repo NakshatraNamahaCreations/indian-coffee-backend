@@ -1,5 +1,6 @@
-const router = require("express").Router();
-const { createCloudinaryUploader } = require("../utils/cloudinaryConfig");
+const express = require("express");
+const router = express.Router();
+const { createUploader } = require("../utils/cloudinaryConfig");
 
 const {
     createPlan,
@@ -12,13 +13,8 @@ const {
     getActiveTraderPlans,
 } = require("../Controller/Plan");
 
-// ✅ Cloudinary-backed multer uploader
-const upload = createCloudinaryUploader(
-    "plans",          // folder
-    "image",          // resource_type
-    undefined,        // allow all image formats
-    3 * 1024 * 1024   // 3MB limit
-);
+// Uploads to Cloudinary folder "plans", images only, max 3 MB
+const upload = createUploader("plans", "image", undefined, 3 * 1024 * 1024);
 
 router.post("/create", upload.single("planImage"), createPlan);
 router.get("/all", getPlans);

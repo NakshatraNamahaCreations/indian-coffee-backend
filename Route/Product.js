@@ -1,53 +1,52 @@
 const express = require("express");
 const router = express.Router();
-const controller = require("../Controller/Product");
 const multer = require("multer");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const { cloudinary } = require("../utils/cloudinaryConfig");
+const controller = require("../Controller/Product");
 
-// ✅ Cloudinary storage with async params for mixed resource types
-const mixedStorage = new CloudinaryStorage({
+/**
+ * Products need three different Cloudinary resource types:
+ *   productImages    → image  (stored in products/images)
+ *   productvideofile → video  (stored in products/videos)
+ *   productFile      → raw    (stored in products/files  — PDFs, docs, etc.)
+ *
+ * We use a single storage with an async params function that returns the
+ * correct config based on which field is being uploaded.
+ */
+const productStorage = new CloudinaryStorage({
     cloudinary,
     params: async (req, file) => {
-        // Images
         if (file.fieldname === "productImages") {
             return {
-                folder: "products/images",
-                resource_type: "image",
-                allowed_formats: ["jpg", "jpeg", "png", "webp"]
+                folder:          "products/images",
+                resource_type:   "image",
+                allowed_formats: ["jpg", "jpeg", "png", "webp"],
             };
         }
-        // Videos
         if (file.fieldname === "productvideofile") {
             return {
-                folder: "products/videos",
-                resource_type: "video"
+                folder:        "products/videos",
+                resource_type: "video",
             };
         }
-        // Raw files (PDF, DOC, XLS, etc.)
         if (file.fieldname === "productFile") {
             return {
-                folder: "products/files",
-                resource_type: "raw"
+                folder:        "products/files",
+                resource_type: "raw",   // PDFs, docs, spreadsheets
             };
         }
-        // Fallback
-        return {
-            folder: "products/misc",
-            resource_type: "auto"
-        };
+        return { folder: "products/misc", resource_type: "auto" };
     },
 });
 
 const upload = multer({
-    storage: mixedStorage,
-    limits: {
-        fileSize: 200 * 1024 * 1024,
-    },
+    storage: productStorage,
+    limits:  { fileSize: 200 * 1024 * 1024 }, // 200 MB (covers large videos)
 });
 
 const uploadImagesAndVideo = upload.fields([
-    { name: "productImages", maxCount: 7 },
+    { name: "productImages",    maxCount: 7 },
     { name: "productvideofile", maxCount: 1 },
 ]);
 
