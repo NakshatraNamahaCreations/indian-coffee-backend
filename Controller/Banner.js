@@ -4,14 +4,18 @@ const { deleteFromCloudinary } = require("../utils/cloudinaryConfig");
 // CREATE
 exports.createBanner = async (req, res) => {
     try {
+
         const { title, description, videoUrl } = req.body;
+        if (!req.file) {
+            return res.status(400).json({ message: "Banner image is required" });
+        }
 
         const banner = new Banner({
-            title:       title || "",
+            title: title || "",
             description: description || "",
-            imageUrl:    req.file ? req.file.path : undefined,
-            videoUrl:    videoUrl || "",
-            status:      "inactive",
+            imageUrl: req.file.path,
+            videoUrl: videoUrl || "",
+            status: "inactive",
         });
 
         await banner.save();
@@ -37,9 +41,9 @@ exports.updateBanner = async (req, res) => {
         const banner = await Banner.findById(req.params.id);
         if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
 
-        if (req.body.title       !== undefined) banner.title       = req.body.title;
+        if (req.body.title !== undefined) banner.title = req.body.title;
         if (req.body.description !== undefined) banner.description = req.body.description;
-        if (req.body.videoUrl    !== undefined) banner.videoUrl    = req.body.videoUrl;
+        if (req.body.videoUrl !== undefined) banner.videoUrl = req.body.videoUrl;
 
         if (req.file) {
             await deleteFromCloudinary(banner.imageUrl, "image");
@@ -78,7 +82,7 @@ exports.updateStatus = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            data:    banner,
+            data: banner,
             message: `Status changed to ${banner.status}`,
         });
     } catch (err) {

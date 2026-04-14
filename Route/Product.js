@@ -6,7 +6,7 @@ const controller = require("../Controller/Product");
 const upload = createProductUploader("indian_coffee/products");
 
 const uploadImagesAndVideo = upload.fields([
-    { name: "productImages",    maxCount: 7 },
+    { name: "productImages", maxCount: 7 },
     { name: "productvideofile", maxCount: 1 },
 ]);
 
