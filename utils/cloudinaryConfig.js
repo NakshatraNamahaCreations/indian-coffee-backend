@@ -24,17 +24,17 @@ function createCloudinaryUploader(
     allowedFormats = undefined,
     fileSizeBytes = 50 * 1024 * 1024
 ) {
-    const params = {
+    const paramsConfig = {
         folder,
         resource_type: resourceType,
     };
     if (allowedFormats && allowedFormats.length > 0) {
-        params.allowed_formats = allowedFormats;
+        paramsConfig.allowed_formats = allowedFormats;
     }
 
     const storage = new CloudinaryStorage({
         cloudinary,
-        params,
+        params: async (req, file) => paramsConfig,  // ✅ Use async function
     });
 
     return multer({

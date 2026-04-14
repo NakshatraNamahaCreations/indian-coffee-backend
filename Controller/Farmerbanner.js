@@ -20,6 +20,7 @@ exports.createBanner = async (req, res) => {
 
         return res.status(201).json({ success: true, data: banner });
     } catch (err) {
+        console.error("❌ Farmerbanner createBanner error:", err);  // ✅ Log error
         return res.status(500).json({ success: false, message: err.message });
     }
 };

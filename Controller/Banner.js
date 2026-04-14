@@ -152,6 +152,7 @@ exports.createBanner = async (req, res) => {
 
         return res.status(201).json({ success: true, data: banner });
     } catch (err) {
+        console.error("❌ createBanner error:", err);  // ✅ Log error for debugging
         return res.status(500).json({ success: false, message: err.message });
     }
 };

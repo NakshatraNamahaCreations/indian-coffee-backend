@@ -38,6 +38,7 @@ exports.createPlan = async (req, res) => {
 
         return res.status(201).json({ success: true, message: "Plan created", data: plan });
     } catch (err) {
+        console.error("❌ createPlan error:", err);  // ✅ Log error
         return res.status(500).json({ success: false, message: err.message });
     }
 };
