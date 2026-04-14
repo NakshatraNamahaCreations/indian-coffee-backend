@@ -90,6 +90,45 @@ app.get("/test", (req, res) => {
     res.status(200).json({ message: "Welcome to Suman Back end" });
 });
 
+// ─── Cloudinary credential test (open in browser to verify) ──────────────────
+// Visit: https://indian-coffee-backend-1.onrender.com/test-cloudinary
+app.get("/test-cloudinary", async (_req, res) => {
+    try {
+        const { cloudinary } = require("./utils/cloudinaryConfig");
+        const cfg = cloudinary.config();
+
+        // Show which env vars are loaded (without revealing the secret)
+        const envStatus = {
+            CLOUDINARY_CLOUD_NAME:   process.env.CLOUDINARY_CLOUD_NAME  || "❌ NOT SET",
+            CLOUDINARY_API_KEY:      process.env.CLOUDINARY_API_KEY     || "❌ NOT SET",
+            CLOUDINARY_API_SECRET:   process.env.CLOUDINARY_API_SECRET  ? "✅ SET (hidden)" : "❌ NOT SET",
+        };
+
+        // Actually ping Cloudinary — this uses the credentials to make a real API call
+        const pingResult = await cloudinary.api.ping();
+
+        return res.json({
+            success:     true,
+            message:     "✅ Cloudinary credentials are CORRECT and working!",
+            cloud_name:  cfg.cloud_name,
+            env:         envStatus,
+            ping:        pingResult,
+        });
+    } catch (err) {
+        const { cloudinary } = require("./utils/cloudinaryConfig");
+        return res.status(500).json({
+            success:  false,
+            message:  "❌ Cloudinary credentials are WRONG — " + err.message,
+            fix:      "Go to Render → your service → Environment → update the 3 Cloudinary vars → Manual Deploy",
+            env: {
+                CLOUDINARY_CLOUD_NAME:  process.env.CLOUDINARY_CLOUD_NAME  || "NOT SET",
+                CLOUDINARY_API_KEY:     process.env.CLOUDINARY_API_KEY     || "NOT SET",
+                CLOUDINARY_API_SECRET:  process.env.CLOUDINARY_API_SECRET  ? "SET (hidden)" : "NOT SET",
+            },
+        });
+    }
+});
+
 // ─── Global error handler (must be last) ─────────────────────────────────────
 app.use((err, req, res, next) => {
     console.error("❌ Error:", err.message);
