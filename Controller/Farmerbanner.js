@@ -1,7 +1,16 @@
-// Controller/Farmerbanner.js
+const fs = require("fs");
+const path = require("path");
 const Banner = require("../Modal/Farmerbanner");
 
-// CREATE — imageUrl is the Cloudinary CDN URL (req.file.path)
+const safeUnlink = (filePath) => {
+    if (!filePath) return;
+    try {
+        const abs = path.join(process.cwd(), filePath.replace(/^\//, ""));
+        if (fs.existsSync(abs)) fs.unlinkSync(abs);
+    } catch (_) {}
+};
+
+// CREATE
 exports.createBanner = async (req, res) => {
     try {
         const { title, description, videoUrl } = req.body;
@@ -9,7 +18,7 @@ exports.createBanner = async (req, res) => {
         const banner = new Banner({
             title,
             description,
-            imageUrl: req.file ? req.file.path : undefined, // Cloudinary CDN URL
+            imageUrl: req.file ? `/uploads/banners/${req.file.filename}` : undefined,
             videoUrl: videoUrl || "",
             status:   "inactive",
         });
@@ -41,7 +50,10 @@ exports.updateBanner = async (req, res) => {
         if (req.body.description !== undefined) banner.description = req.body.description;
         if (req.body.videoUrl    !== undefined) banner.videoUrl    = req.body.videoUrl;
 
-        if (req.file) banner.imageUrl = req.file.path; // new Cloudinary URL
+        if (req.file) {
+            safeUnlink(banner.imageUrl);
+            banner.imageUrl = `/uploads/banners/${req.file.filename}`;
+        }
 
         await banner.save();
         return res.status(200).json({ success: true, data: banner });
@@ -56,6 +68,7 @@ exports.deleteBanner = async (req, res) => {
         const banner = await Banner.findById(req.params.id);
         if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
 
+        safeUnlink(banner.imageUrl);
         await Banner.findByIdAndDelete(req.params.id);
         return res.status(200).json({ success: true, message: "Banner deleted" });
     } catch (err) {

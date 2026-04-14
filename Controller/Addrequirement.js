@@ -63,7 +63,7 @@ exports.createProduct = async (req, res) => {
 
     let productImage = "";
     if (req.file) {
-      productImage = req.file.path; // Cloudinary CDN URL
+      productImage = `/uploads/products/${req.file.filename}`;
     }
 
     const [category, subcategory, weightUnit] = await Promise.all([

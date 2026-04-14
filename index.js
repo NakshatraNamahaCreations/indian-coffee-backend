@@ -7,9 +7,6 @@ require("dotenv").config();
 const cookieParser = require("cookie-parser");
 const path = require("path");
 
-// Load Cloudinary config at startup so the env-var check runs immediately
-require("./utils/cloudinaryConfig");
-
 mongoose
     .connect(process.env.MONGO_URI, {
         // useNewUrlParser: true,
@@ -54,7 +51,7 @@ const farmerSubscriptionRoute = require("./Route/FarmerSubscription");
 const { startResetSellingCron } = require("./corn/resetSellingDaily");
 const { startResetMonthlyListingsCron } = require("./corn/resetMonthlyListings");
 const deleteuserRoute = require("./Route/Deleteuser");
-// tyui
+
 app.use("/api", adminRoute);
 app.use("/api", categoryRoute);
 app.use("/api", VendorRoute);
@@ -90,45 +87,6 @@ app.get("/test", (req, res) => {
     res.status(200).json({ message: "Welcome to Suman Back end" });
 });
 
-// ─── Cloudinary credential test (open in browser to verify) ──────────────────
-// Visit: https://indian-coffee-backend-1.onrender.com/test-cloudinary
-app.get("/test-cloudinary", async (_req, res) => {
-    try {
-        const { cloudinary } = require("./utils/cloudinaryConfig");
-        const cfg = cloudinary.config();
-
-        // Show which env vars are loaded (without revealing the secret)
-        const envStatus = {
-            CLOUDINARY_CLOUD_NAME:   process.env.CLOUDINARY_CLOUD_NAME  || "❌ NOT SET",
-            CLOUDINARY_API_KEY:      process.env.CLOUDINARY_API_KEY     || "❌ NOT SET",
-            CLOUDINARY_API_SECRET:   process.env.CLOUDINARY_API_SECRET  ? "✅ SET (hidden)" : "❌ NOT SET",
-        };
-
-        // Actually ping Cloudinary — this uses the credentials to make a real API call
-        const pingResult = await cloudinary.api.ping();
-
-        return res.json({
-            success:     true,
-            message:     "✅ Cloudinary credentials are CORRECT and working!",
-            cloud_name:  cfg.cloud_name,
-            env:         envStatus,
-            ping:        pingResult,
-        });
-    } catch (err) {
-        const { cloudinary } = require("./utils/cloudinaryConfig");
-        return res.status(500).json({
-            success:  false,
-            message:  "❌ Cloudinary credentials are WRONG — " + err.message,
-            fix:      "Go to Render → your service → Environment → update the 3 Cloudinary vars → Manual Deploy",
-            env: {
-                CLOUDINARY_CLOUD_NAME:  process.env.CLOUDINARY_CLOUD_NAME  || "NOT SET",
-                CLOUDINARY_API_KEY:     process.env.CLOUDINARY_API_KEY     || "NOT SET",
-                CLOUDINARY_API_SECRET:  process.env.CLOUDINARY_API_SECRET  ? "SET (hidden)" : "NOT SET",
-            },
-        });
-    }
-});
-
 // ─── Global error handler (must be last) ─────────────────────────────────────
 app.use((err, req, res, next) => {
     console.error("❌ Error:", err.message);
@@ -141,15 +99,6 @@ app.use((err, req, res, next) => {
     // Any multer error
     if (err.name === "MulterError") {
         return res.status(400).json({ success: false, message: `Upload error: ${err.message}` });
-    }
-
-    // Cloudinary "Invalid Signature" → credentials mismatch on Render
-    if (err.message && err.message.includes("Invalid Signature")) {
-        console.error("🔑  Cloudinary signature mismatch — check CLOUDINARY_API_SECRET on Render and redeploy.");
-        return res.status(500).json({
-            success: false,
-            message: "Image upload failed: server credentials are misconfigured. Please contact support.",
-        });
     }
 
     // Everything else

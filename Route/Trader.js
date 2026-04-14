@@ -1,17 +1,28 @@
-
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 const ctrl = require("../Controller/Trader");
-const { createUploader } = require("../utils/cloudinaryConfig");
 
-// KYC documents for traders stored in Cloudinary folder "kyc/traders"
-const upload = createUploader("kyc/traders", "image");
+const uploadDir = path.join(process.cwd(), "uploads/kyc");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `${file.fieldname}-${Date.now()}${ext}`);
+    },
+});
+
+const upload = multer({ storage });
 
 const cpUpload = upload.fields([
-    { name: "aadhaarFront",    maxCount: 1 },
-    { name: "aadhaarBack",     maxCount: 1 },
-    { name: "panImage",        maxCount: 1 },
-    { name: "gstImage",        maxCount: 1 },
+    { name: "aadhaarFront",     maxCount: 1 },
+    { name: "aadhaarBack",      maxCount: 1 },
+    { name: "panImage",         maxCount: 1 },
+    { name: "gstImage",         maxCount: 1 },
     { name: "registrationDocs", maxCount: 10 },
 ]);
 
@@ -30,4 +41,3 @@ router.post("/trader/save-fcm-token", ctrl.saveFcmToken);
 router.post("/trader/delete-account", ctrl.deleteAccount);
 
 module.exports = router;
-

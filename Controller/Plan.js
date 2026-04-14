@@ -1,7 +1,13 @@
+const fs = require("fs");
 const Plan = require("../Modal/Plan");
 
-// No local file deletion needed — images are stored on Cloudinary
-const deleteFile = () => {};
+const deleteFile = (filePath) => {
+    if (!filePath) return;
+    try {
+        const p = filePath.startsWith("/") ? filePath.slice(1) : filePath;
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+    } catch (_) {}
+};
 
 exports.createPlan = async (req, res) => {
     try {
@@ -11,7 +17,7 @@ exports.createPlan = async (req, res) => {
             return res.status(400).json({ success: false, message: "planName is required" });
         }
 
-        const planImage = req.file ? req.file.path : ""; // Cloudinary CDN URL
+        const planImage = req.file ? `/${req.file.path.replace(/\\/g, "/")}` : "";
 
         const plan = await Plan.create({
             planName,
@@ -45,7 +51,6 @@ exports.getPlanById = async (req, res) => {
     try {
         const plan = await Plan.findById(req.params.id);
         if (!plan) return res.status(404).json({ success: false, message: "Plan not found" });
-
         return res.json({ success: true, data: plan });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
@@ -74,7 +79,7 @@ exports.updatePlan = async (req, res) => {
 
         if (req.file) {
             deleteFile(oldPlan.planImage);
-            oldPlan.planImage = req.file.path; // Cloudinary CDN URL
+            oldPlan.planImage = `/${req.file.path.replace(/\\/g, "/")}`;
         } else if (String(removeImage) === "true") {
             deleteFile(oldPlan.planImage);
             oldPlan.planImage = "";

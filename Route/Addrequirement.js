@@ -1,16 +1,23 @@
 // Route/Addrequirement.js
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 const RequirementController = require("../Controller/Addrequirement");
-const { createUploader } = require("../utils/cloudinaryConfig");
 
-// Uploads to Cloudinary folder "requirements", images only, max 5 MB
-const uploadProductImage = createUploader(
-    "requirements",
-    "image",
-    ["jpg", "jpeg", "png", "webp"],
-    5 * 1024 * 1024
-);
+const uploadDir = path.join(process.cwd(), "uploads/products");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `requirement-${Date.now()}${ext}`);
+    },
+});
+
+const uploadProductImage = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.post("/createrequirement", uploadProductImage.single("productImage"), RequirementController.createProduct);
 
@@ -39,6 +46,5 @@ router.put(
   "/requirements/:requirementId/offers/:vendorId/admin-action",
   RequirementController.adminAcceptRejectOffer
 );
-
 
 module.exports = router;
