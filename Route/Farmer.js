@@ -1,22 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const farmerController = require("../Controller/Farmer");
-const multer = require("multer");
-const path = require("path");
+const { createCloudinaryUploader } = require("../utils/cloudinaryConfig");
 
-
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, "uploads/");
-    },
-    filename: function (req, file, cb) {
-        const uniqueName =
-            Date.now() + "-" + Math.round(Math.random() * 1e9);
-        cb(null, uniqueName + path.extname(file.originalname));
-    },
-});
-
-const upload = multer({ storage });
+// ✅ Cloudinary-backed multer uploader
+const upload = createCloudinaryUploader(
+    "kyc/farmer",  // folder
+    "image"        // resource_type
+);
 
 const uploadFields = upload.fields([
     { name: "aadhaarFront", maxCount: 1 },

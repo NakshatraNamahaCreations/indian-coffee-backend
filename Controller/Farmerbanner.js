@@ -11,7 +11,7 @@ exports.createBanner = async (req, res) => {
         const banner = new Banner({
             title,
             description,
-            imageUrl: req.file ? `/uploads/banners/${req.file.filename}` : undefined,
+            imageUrl: req.file ? req.file.path : undefined,  // ✅ Cloudinary URL
             videoUrl: videoUrl || "",
             status: "inactive",
         });
@@ -47,13 +47,9 @@ exports.updateBanner = async (req, res) => {
         if (typeof req.body.description !== "undefined") banner.description = req.body.description;
         if (typeof req.body.videoUrl !== "undefined") banner.videoUrl = req.body.videoUrl;
 
-        // if new file uploaded => delete old file + save new path
+        // if new file uploaded => file is on Cloudinary (no local deletion)
         if (req.file) {
-            if (banner.imageUrl) {
-                const oldPath = path.join(process.cwd(), banner.imageUrl.replace(/^\//, "")); // remove leading /
-                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-            }
-            banner.imageUrl = `/uploads/banners/${req.file.filename}`;
+            banner.imageUrl = req.file.path;  // ✅ Cloudinary URL
         }
 
         await banner.save();
@@ -64,7 +60,7 @@ exports.updateBanner = async (req, res) => {
     }
 };
 
-// ✅ DELETE (also delete file)
+// ✅ DELETE (file is on Cloudinary — no local deletion needed)
 exports.deleteBanner = async (req, res) => {
     try {
         const banner = await Banner.findById(req.params.id);
@@ -72,11 +68,7 @@ exports.deleteBanner = async (req, res) => {
             return res.status(404).json({ success: false, message: "Banner not found" });
         }
 
-        if (banner.image) {
-            const filePath = path.join(process.cwd(), banner.image.replace(/^\//, ""));
-            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        }
-
+        // ✅ File deletion is handled by Cloudinary — just remove the DB record
         await Banner.findByIdAndDelete(req.params.id);
 
         return res.status(200).json({ success: true, message: "Banner deleted" });

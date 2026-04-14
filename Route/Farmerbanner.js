@@ -16,30 +16,16 @@
 
 const express = require("express");
 const router = express.Router();
-const path = require("path");
-const multer = require("multer");
+const { createCloudinaryUploader } = require("../utils/cloudinaryConfig");
 const bannerController = require("../Controller/Farmerbanner");
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, "uploads/banners"),
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        cb(null, `banner-${Date.now()}${ext}`);
-    },
-});
-
-
-const fileFilter = (req, file, cb) => {
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Only image files are allowed (jpg, jpeg, png, webp)"), false);
-};
-
-const upload = multer({
-    storage,
-    fileFilter,
-    limits: { fileSize: 10 * 1024 * 1024 },
-});
+// ✅ Cloudinary-backed multer uploader
+const upload = createCloudinaryUploader(
+    "banners",                      // folder (same as main banners)
+    "image",                        // resource_type
+    ["jpg", "jpeg", "png", "webp"], // allowed formats
+    10 * 1024 * 1024                // 10MB limit
+);
 
 
 router.post("/createbanner", upload.single("image"), bannerController.createBanner);

@@ -1,18 +1,13 @@
 const express = require("express");
 const router = express.Router();
-const multer = require("multer");
+const { createCloudinaryUploader } = require("../utils/cloudinaryConfig");
 const subcategoryController = require("../Controller/Subcategory");
 
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, "uploads/subcategory");
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + "-" + file.originalname);
-    }
-});
-
-const upload = multer({ storage });
+// ✅ Cloudinary-backed multer uploader
+const upload = createCloudinaryUploader(
+    "subcategory",  // folder
+    "image"         // resource_type
+);
 
 router.post(
     "/createsubcategory",

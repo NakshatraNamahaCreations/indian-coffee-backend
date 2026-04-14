@@ -1,9 +1,12 @@
 const Plan = require("../Modal/Plan");
 const fs = require("fs");
 
+// ✅ Updated to skip Cloudinary URLs
 const deleteFile = (filePath) => {
     try {
         if (!filePath) return;
+        // Skip Cloudinary URLs — only delete local files
+        if (filePath.startsWith("http://") || filePath.startsWith("https://")) return;
         const localPath = filePath.startsWith("/") ? filePath.slice(1) : filePath;
         if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
     } catch (e) { }
@@ -17,7 +20,8 @@ exports.createPlan = async (req, res) => {
             return res.status(400).json({ success: false, message: "planName is required" });
         }
 
-        const planImage = req.file ? `/${req.file.path.replace(/\\/g, "/")}` : "";
+        // ✅ req.file.path is already a Cloudinary URL, no wrapping needed
+        const planImage = req.file ? req.file.path : "";
 
         const plan = await Plan.create({
             planName,
@@ -80,7 +84,8 @@ exports.updatePlan = async (req, res) => {
 
         if (req.file) {
             deleteFile(oldPlan.planImage);
-            oldPlan.planImage = `/${req.file.path.replace(/\\/g, "/")}`;
+            // ✅ req.file.path is already a Cloudinary URL
+            oldPlan.planImage = req.file.path;
         } else if (String(removeImage) === "true") {
             deleteFile(oldPlan.planImage);
             oldPlan.planImage = "";

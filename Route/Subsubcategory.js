@@ -1,31 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const controller = require("../Controller/Subsubcategory");
-const multer = require("multer");
-const path = require("path");
+const { createCloudinaryUploader } = require("../utils/cloudinaryConfig");
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, "uploads/subsubcategory/");
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + "-" + file.originalname);
-    }
-});
-
-const fileFilter = (req, file, cb) => {
-    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    if (allowed.includes(file.mimetype)) {
-        cb(null, true);
-    } else {
-        cb(new Error("Only image files allowed"), false);
-    }
-};
-
-const upload = multer({
-    storage,
-    fileFilter
-});
+// ✅ Cloudinary-backed multer uploader
+const upload = createCloudinaryUploader(
+    "subsubcategory",               // folder
+    "image",                        // resource_type
+    ["jpg", "jpeg", "png", "webp"]  // allowed formats
+);
 
 
 

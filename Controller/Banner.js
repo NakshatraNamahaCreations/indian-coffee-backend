@@ -143,7 +143,7 @@ exports.createBanner = async (req, res) => {
         const banner = new Banner({
             title: title || "",
             description: description || "",
-            imageUrl: `/uploads/banners/${req.file.filename}`,
+            imageUrl: req.file.path,  // ✅ Cloudinary URL
             videoUrl: videoUrl || "",
             status: "inactive",
         });
@@ -179,12 +179,8 @@ exports.updateBanner = async (req, res) => {
         if (typeof req.body.videoUrl !== "undefined") banner.videoUrl = req.body.videoUrl;
 
         if (req.file) {
-            // ✅ delete old image
-            if (banner.imageUrl) {
-                const oldAbsPath = path.join(process.cwd(), banner.imageUrl.replace(/^\//, ""));
-                safeUnlink(oldAbsPath);
-            }
-            banner.imageUrl = `/uploads/banners/${req.file.filename}`;
+            // ✅ File is now on Cloudinary — no local deletion needed
+            banner.imageUrl = req.file.path;  // ✅ Cloudinary URL
         }
 
         await banner.save();
@@ -194,7 +190,7 @@ exports.updateBanner = async (req, res) => {
     }
 };
 
-// ✅ DELETE (also delete file)
+// ✅ DELETE (file is on Cloudinary — no local deletion needed)
 exports.deleteBanner = async (req, res) => {
     try {
         const banner = await Banner.findById(req.params.id);
@@ -202,12 +198,7 @@ exports.deleteBanner = async (req, res) => {
             return res.status(404).json({ success: false, message: "Banner not found" });
         }
 
-        // ✅ FIX: use imageUrl (not banner.image)
-        if (banner.imageUrl) {
-            const fileAbsPath = path.join(process.cwd(), banner.imageUrl.replace(/^\//, ""));
-            safeUnlink(fileAbsPath);
-        }
-
+        // ✅ File deletion is handled by Cloudinary — just remove the DB record
         await Banner.findByIdAndDelete(req.params.id);
 
         return res.status(200).json({ success: true, message: "Banner deleted" });

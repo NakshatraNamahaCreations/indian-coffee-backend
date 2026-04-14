@@ -2,25 +2,13 @@
 const express = require("express");
 const router = express.Router();
 const ctrl = require("../Controller/Trader");
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { createCloudinaryUploader } = require("../utils/cloudinaryConfig");
 
-
-if (!fs.existsSync("uploads")) {
-    fs.mkdirSync("uploads");
-}
-
-
-const storage = multer.diskStorage({
-    destination: "uploads/",
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
-    },
-});
-
-
-const upload = multer({ dest: 'uploads/' });
+// ✅ Cloudinary-backed multer uploader
+const upload = createCloudinaryUploader(
+    "kyc/trader",  // folder
+    "image"        // resource_type
+);
 
 const cpUpload = upload.fields([
     { name: "aadhaarFront", maxCount: 1 },

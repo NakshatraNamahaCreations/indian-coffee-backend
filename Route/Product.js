@@ -2,90 +2,49 @@ const express = require("express");
 const router = express.Router();
 const controller = require("../Controller/Product");
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const { cloudinary } = require("../utils/cloudinaryConfig");
 
-
-const IMAGE_DIR = "uploads/products";
-const FILE_DIR = "uploads/productFiles";
-const VIDEO_DIR = "uploads/productVideos";
-
-[IMAGE_DIR, FILE_DIR, VIDEO_DIR].forEach((dir) => {
-    try {
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    } catch (e) {
-        console.log("mkdir error:", e.message);
-    }
-});
-
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        try {
-            if (file.fieldname === "productImages") return cb(null, IMAGE_DIR);
-            if (file.fieldname === "productFile") return cb(null, FILE_DIR);
-            if (file.fieldname === "productvideofile") return cb(null, VIDEO_DIR);
-            return cb(null, "uploads");
-        } catch (e) {
-            return cb(e);
-        }
-    },
-    filename: (req, file, cb) => {
-        try {
-            const ext = path.extname(file.originalname || "").toLowerCase();
-            const base = path.basename(file.originalname || "file", ext);
-            const safeBase = base.replace(/[^\w\-]+/g, "-");
-            cb(null, `${file.fieldname}-${Date.now()}-${safeBase}${ext || ""}`);
-        } catch (e) {
-            cb(e);
-        }
-    },
-});
-
-
-const fileFilter = (req, file, cb) => {
-    try {
-        // images
+// ✅ Cloudinary storage with async params for mixed resource types
+const mixedStorage = new CloudinaryStorage({
+    cloudinary,
+    params: async (req, file) => {
+        // Images
         if (file.fieldname === "productImages") {
-            const ok = file.mimetype?.startsWith("image/");
-            return cb(ok ? null : new Error("Only image files allowed"), ok);
+            return {
+                folder: "products/images",
+                resource_type: "image",
+                allowed_formats: ["jpg", "jpeg", "png", "webp"]
+            };
         }
-
-        // video
+        // Videos
         if (file.fieldname === "productvideofile") {
-            const ok = file.mimetype?.startsWith("video/");
-            return cb(ok ? null : new Error("Only video files allowed"), ok);
+            return {
+                folder: "products/videos",
+                resource_type: "video"
+            };
         }
-
-        // generic productFile (pdf/doc/docx/etc)
+        // Raw files (PDF, DOC, XLS, etc.)
         if (file.fieldname === "productFile") {
-            const allowed = new Set([
-                "application/pdf",
-                "application/msword",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "application/vnd.ms-excel",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "text/plain",
-            ]);
-            const ok = allowed.has(file.mimetype);
-            return cb(ok ? null : new Error("Unsupported productFile type"), ok);
+            return {
+                folder: "products/files",
+                resource_type: "raw"
+            };
         }
-
-        return cb(new Error("Invalid upload fieldname"), false);
-    } catch (e) {
-        return cb(e, false);
-    }
-};
-
+        // Fallback
+        return {
+            folder: "products/misc",
+            resource_type: "auto"
+        };
+    },
+});
 
 const upload = multer({
-    storage,
-    fileFilter,
+    storage: mixedStorage,
     limits: {
         fileSize: 200 * 1024 * 1024,
     },
 });
-
 
 const uploadImagesAndVideo = upload.fields([
     { name: "productImages", maxCount: 7 },
