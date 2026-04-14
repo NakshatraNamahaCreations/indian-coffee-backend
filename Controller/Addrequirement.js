@@ -478,15 +478,29 @@ exports.updateApproval = async (req, res) => {
       const traderId = String(updated.userId || "");
 
       if (mongoose.Types.ObjectId.isValid(traderId)) {
-        const traderDoc = await Trader.findById(traderId).select("_id name status");
+        const traderDoc = await Trader.findById(traderId).select("_id name status fcmToken");
 
         if (traderDoc) {
+          const statusLabel =
+            approvalStatus === "admin_approved" ? "Approved" :
+            approvalStatus === "final_admin_approved" ? "Final Approved" :
+            approvalStatus === "rejected" ? "Rejected" :
+            approvalStatus;
+
+          const pushTitle = approvalStatus === "admin_approved" || approvalStatus === "final_admin_approved"
+            ? "✅ Requirement Approved"
+            : approvalStatus === "rejected"
+              ? "❌ Requirement Rejected"
+              : "📌 Requirement Status Updated";
+
+          const pushBody = `Your requirement "${requirementTitle}" has been ${statusLabel.toLowerCase()}.`;
+
           await InAppNotification.create({
             userId: String(traderDoc._id),
-            notificationType: "NEW_PRODUCT_AVAILABLE",
-            thumbnailTitle: "📌 Approval Status Updated",
+            notificationType: "REQUIREMENT_STATUS_UPDATED",
+            thumbnailTitle: pushTitle,
             notifyTo: "customer",
-            message: `Your product "${requirementTitle}" approval status changed to "${approvalStatus}".`,
+            message: pushBody,
             metaData: {
               requirementId: String(updated._id),
               traderId: String(traderDoc._id),
@@ -494,6 +508,11 @@ exports.updateApproval = async (req, res) => {
             },
             status: "unread",
           });
+
+          // Push notification to trader's device
+          if (traderDoc.fcmToken) {
+            await sendPushNotificationTrader(traderDoc.fcmToken, pushTitle, pushBody);
+          }
         }
       }
     } catch (notiErr) {
@@ -505,7 +524,7 @@ exports.updateApproval = async (req, res) => {
     // ----------------------------------
     if (approvalStatus === "admin_approved") {
       try {
-        const farmers = await Farmer.find({}).select("_id");
+        const farmers = await Farmer.find({}).select("_id fcmToken");
 
         if (farmers?.length) {
           const farmerNotis = farmers.map((f) => ({
@@ -514,7 +533,6 @@ exports.updateApproval = async (req, res) => {
             thumbnailTitle: "🆕 New Trader Requirement",
             notifyTo: "vendor",
             message: `There is a new requirement for "${requirementTitle}", See details`,
-            // message: `New product "${requirementTitle}" is now available. Check it in the app.`,
             metaData: {
               requirementId: String(updated._id),
               approvalStatus,
@@ -523,6 +541,18 @@ exports.updateApproval = async (req, res) => {
           }));
 
           await InAppNotification.insertMany(farmerNotis, { ordered: false });
+
+          // Push notifications to all farmers with a registered token
+          const pushPromises = farmers
+            .filter((f) => f.fcmToken)
+            .map((f) =>
+              sendPushNotification(
+                f.fcmToken,
+                "🆕 New Trader Requirement",
+                `New requirement: "${requirementTitle}". See details in the app.`
+              ).catch(() => {})
+            );
+          await Promise.allSettled(pushPromises);
         }
       } catch (bulkErr) {
         console.error("Farmer bulk notification failed:", bulkErr.message);
