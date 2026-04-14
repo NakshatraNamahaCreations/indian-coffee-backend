@@ -9,14 +9,22 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// ✅ Debug logging
+// ✅ Debug logging with detailed information
+console.log("\n📦 Cloudinary Configuration Status:");
+console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+console.log("Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME ? `✓ ${process.env.CLOUDINARY_CLOUD_NAME}` : "✗ NOT SET");
+console.log("API Key:", process.env.CLOUDINARY_API_KEY ? "✓ SET" : "✗ NOT SET");
+console.log("API Secret:", process.env.CLOUDINARY_API_SECRET ? "✓ SET" : "✗ NOT SET");
+console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
 if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-    console.warn("⚠️  WARNING: Cloudinary environment variables not fully set!");
-    console.warn("Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME ? "✓" : "✗");
-    console.warn("API Key:", process.env.CLOUDINARY_API_KEY ? "✓" : "✗");
-    console.warn("API Secret:", process.env.CLOUDINARY_API_SECRET ? "✓" : "✗");
+    console.error("❌ CRITICAL: Cloudinary environment variables are not fully configured!");
+    console.error("Please ensure these environment variables are set on Render:");
+    console.error("  - CLOUDINARY_CLOUD_NAME");
+    console.error("  - CLOUDINARY_API_KEY");
+    console.error("  - CLOUDINARY_API_SECRET");
 } else {
-    console.log("✅ Cloudinary configured successfully");
+    console.log("✅ Cloudinary is fully configured and ready for use");
 }
 
 /**

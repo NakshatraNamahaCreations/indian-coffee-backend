@@ -87,23 +87,68 @@ app.get("/test", (req, res) => {
     res.status(200).json({ message: "Welcome to Suman Back end" });
 });
 
+// ✅ Diagnostic endpoint to verify Cloudinary configuration
+app.get("/api/cloudinary-health", (req, res) => {
+    const { cloudinary } = require("./utils/cloudinaryConfig");
+    const config = cloudinary.config();
+
+    const isConfigured = !!(
+        config.cloud_name &&
+        config.api_key &&
+        config.api_secret
+    );
+
+    return res.status(200).json({
+        success: true,
+        cloudinary_configured: isConfigured,
+        cloud_name: config.cloud_name || "NOT SET",
+        api_key: config.api_key ? "***SET***" : "NOT SET",
+        api_secret: config.api_secret ? "***SET***" : "NOT SET",
+        env_vars: {
+            CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || "NOT SET",
+            CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY ? "***SET***" : "NOT SET",
+            CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET ? "***SET***" : "NOT SET",
+        }
+    });
+});
+
 // ✅ ERROR HANDLING MIDDLEWARE (must be last)
 app.use((err, req, res, next) => {
-    console.error("❌ Error caught:", err.message);
-    console.error("Stack:", err.stack);
+    console.error("\n❌ ERROR CAUGHT:");
+    console.error("Message:", err.message);
+    console.error("Name:", err.name);
+    console.error("Code:", err.code);
+    if (err.stack) console.error("Stack:", err.stack.split("\n").slice(0, 3).join("\n"));
+    console.log("");
 
     // Multer errors
     if (err.name === "MulterError") {
+        console.error("📤 Multer File Upload Error:", err.code);
         return res.status(400).json({
             success: false,
+            error_type: "MULTER_ERROR",
+            error_code: err.code,
             message: `Upload error: ${err.message}`,
         });
     }
 
-    // Cloudinary errors
+    // Cloudinary signature/authentication errors
+    if (err.message && err.message.includes("Invalid Signature")) {
+        console.error("🔐 Cloudinary Signature Error - Check credentials on Render!");
+        return res.status(401).json({
+            success: false,
+            error_type: "CLOUDINARY_SIGNATURE_ERROR",
+            message: "Cloudinary credentials mismatch. Verify API_SECRET matches Cloudinary account and restart service on Render.",
+            debug: err.message,
+        });
+    }
+
+    // Other Cloudinary errors
     if (err.message && err.message.includes("Cloudinary")) {
+        console.error("☁️  Cloudinary Error");
         return res.status(400).json({
             success: false,
+            error_type: "CLOUDINARY_ERROR",
             message: `Cloudinary error: ${err.message}`,
         });
     }
@@ -111,6 +156,7 @@ app.use((err, req, res, next) => {
     // Generic errors
     return res.status(err.status || 500).json({
         success: false,
+        error_type: "GENERIC_ERROR",
         message: err.message || "Internal server error",
     });
 });
