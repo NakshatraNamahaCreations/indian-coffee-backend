@@ -9,6 +9,16 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// ✅ Debug logging
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    console.warn("⚠️  WARNING: Cloudinary environment variables not fully set!");
+    console.warn("Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME ? "✓" : "✗");
+    console.warn("API Key:", process.env.CLOUDINARY_API_KEY ? "✓" : "✗");
+    console.warn("API Secret:", process.env.CLOUDINARY_API_SECRET ? "✓" : "✗");
+} else {
+    console.log("✅ Cloudinary configured successfully");
+}
+
 /**
  * Creates a multer instance backed by Cloudinary storage.
  *

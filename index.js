@@ -87,6 +87,34 @@ app.get("/test", (req, res) => {
     res.status(200).json({ message: "Welcome to Suman Back end" });
 });
 
+// ✅ ERROR HANDLING MIDDLEWARE (must be last)
+app.use((err, req, res, next) => {
+    console.error("❌ Error caught:", err.message);
+    console.error("Stack:", err.stack);
+
+    // Multer errors
+    if (err.name === "MulterError") {
+        return res.status(400).json({
+            success: false,
+            message: `Upload error: ${err.message}`,
+        });
+    }
+
+    // Cloudinary errors
+    if (err.message && err.message.includes("Cloudinary")) {
+        return res.status(400).json({
+            success: false,
+            message: `Cloudinary error: ${err.message}`,
+        });
+    }
+
+    // Generic errors
+    return res.status(err.status || 500).json({
+        success: false,
+        message: err.message || "Internal server error",
+    });
+});
+
 app.listen(PORT, () => {
     console.log("Server is running on", PORT);
 });
