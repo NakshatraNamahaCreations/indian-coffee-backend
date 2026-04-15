@@ -244,7 +244,8 @@ exports.createBid = async (req, res) => {
                     await sendPushNotification(
                         vendor.fcmToken,
                         "📢 New Bid Received",
-                        `New bid on ${product.productTitle || "your product"}`
+                        `New bid on ${product.productTitle || "your product"}`,
+                        { notificationType: "NEW_BID_RECEIVED", productId: String(product._id) }
                     );
                 }
             }
@@ -399,7 +400,8 @@ exports.vendorAcceptBid = async (req, res) => {
                     await sendPushNotificationTrader(
                         trader.fcmToken,
                         "✅ Bid Accepted by Vendor",
-                        "Vendor accepted your bid. Waiting for admin approval."
+                        "Vendor accepted your bid. Waiting for admin approval.",
+                        { notificationType: "BID_ACCEPTED", bidId: String(bid._id) }
                     );
                 }
             }
@@ -478,7 +480,8 @@ exports.vendorRejectBid = async (req, res) => {
                     await sendPushNotificationTrader(
                         trader.fcmToken,
                         "❌ Bid Rejected by Vendor",
-                        "Vendor rejected your bid. You can place a new bid or try again."
+                        "Vendor rejected your bid. You can place a new bid or try again.",
+                        { notificationType: "BID_REJECTED", bidId: String(bid._id) }
                     );
                 }
             }
@@ -1125,7 +1128,8 @@ exports.adminApproveBid = async (req, res) => {
                     await sendPushNotificationTrader(
                         trader.fcmToken,
                         "🎉 Bid Approved by Admin",
-                        "Your bid has been approved by admin. Please proceed with next steps."
+                        "Your bid has been approved by admin. Please proceed with next steps.",
+                        { notificationType: "BID_APPROVED", bidId: String(bid._id) }
                     );
                 }
             }
@@ -1136,7 +1140,8 @@ exports.adminApproveBid = async (req, res) => {
                     await sendPushNotification(
                         farmer.fcmToken,
                         "✅ Bid Approved by Admin",
-                        "Admin approved the bid. You can proceed with the order."
+                        "Admin approved the bid. You can proceed with the order.",
+                        { notificationType: "BID_APPROVED", bidId: String(bid._id) }
                     );
                 }
             }
@@ -1306,7 +1311,8 @@ exports.adminrejectBid = async (req, res) => {
                     await sendPushNotificationTrader(
                         trader.fcmToken,
                         "❌ Bid Rejected by Admin",
-                        "Your bid has been rejected by admin."
+                        "Your bid has been rejected by admin.",
+                        { notificationType: "BID_REJECTED", bidId: String(bid._id) }
                     );
                 }
             }
@@ -1317,7 +1323,8 @@ exports.adminrejectBid = async (req, res) => {
                     await sendPushNotification(
                         farmer.fcmToken,
                         "❌ Bid Rejected by Admin",
-                        "Admin rejected the bid."
+                        "Admin rejected the bid.",
+                        { notificationType: "BID_REJECTED", bidId: String(bid._id) }
                     );
                 }
             }

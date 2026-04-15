@@ -32,6 +32,31 @@ exports.createDailyMarketPrice = async (req, res) => {
     }
 };
 
+exports.updateDailyMarketPrice = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { categories } = req.body;
+
+        if (!categories || categories.length === 0) {
+            return res.status(400).json({ message: "Categories required" });
+        }
+
+        const updated = await DailyMarketPrice.findByIdAndUpdate(
+            id,
+            { $set: { categories } },
+            { new: true }
+        );
+
+        if (!updated) {
+            return res.status(404).json({ success: false, message: "Record not found" });
+        }
+
+        res.status(200).json({ success: true, message: "Daily market prices updated", data: updated });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 exports.getAllDailyMarketPrices = async (req, res) => {
     const data = await DailyMarketPrice.find().sort({ date: -1 });
     res.json({ success: true, data });

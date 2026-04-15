@@ -355,7 +355,10 @@ exports.updateProductStatus = async (req, res) => {
                     : `⏸️ Your product "${updatedProduct.productTitle}" is now Inactive.`;
 
             if (fcmToken) {
-                await sendPushNotification(fcmToken, title, body);
+                await sendPushNotification(fcmToken, title, body, {
+                    notificationType: "PRODUCT_STATUS_UPDATED",
+                    productId: String(updatedProduct._id),
+                });
             }
         } catch (e) {
             console.log("Vendor push failed:", e.message);
@@ -373,6 +376,7 @@ exports.updateProductStatus = async (req, res) => {
                 if (traders.length) {
                     const title = "New Product Available";
                     const body = `🔥 "${updatedProduct.productTitle}" is now Active. Check it out!`;
+                    const data = { notificationType: "NEW_PRODUCT_AVAILABLE", productId: String(updatedProduct._id) };
 
                     // send in batches (avoid huge burst)
                     const BATCH_SIZE = 400;
@@ -381,7 +385,7 @@ exports.updateProductStatus = async (req, res) => {
 
                         await Promise.allSettled(
                             batch.map((t) =>
-                                sendTraderPushnotification(t.fcmToken, title, body)
+                                sendTraderPushnotification(t.fcmToken, title, body, data)
                             )
                         );
                     }
@@ -1004,6 +1008,7 @@ exports.updateProductBidActive = async (req, res) => {
                 if (traders.length) {
                     const title = "Bidding Started";
                     const body = `✅ Bidding is now available for "${product.productTitle}". Place your bid now!`;
+                    const data = { notificationType: "BID_ACTIVE", productId: String(product._id) };
 
                     // batching to avoid overload
                     const BATCH_SIZE = 400;
@@ -1012,7 +1017,7 @@ exports.updateProductBidActive = async (req, res) => {
 
                         await Promise.allSettled(
                             batch.map((t) =>
-                                sendTraderPushnotification(t.fcmToken, title, body)
+                                sendTraderPushnotification(t.fcmToken, title, body, data)
                             )
                         );
                     }

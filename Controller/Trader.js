@@ -558,7 +558,7 @@ exports.updateStatus = async (req, res) => {
                         ? "Admin approved your account. You can start using the app."
                         : "Your account has been deactivated by admin. Please contact support.";
 
-                await sendPushNotification(trader.fcmToken, title, body);
+                await sendPushNotification(trader.fcmToken, title, body, { notificationType: "ACCOUNT_STATUS_UPDATED", status: trader.status });
             }
         } catch (pushErr) {
             console.error("Push notification failed:", pushErr.message);

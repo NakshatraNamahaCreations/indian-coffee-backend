@@ -1,19 +1,47 @@
 const admin = require("./firebasetrader");
 
-const sendPushNotificationTrader = async (fcmToken, title, body) => {
+/**
+ * Send a push notification to a Trader device.
+ *
+ * @param {string} fcmToken   - Device FCM token
+ * @param {string} title      - Notification title
+ * @param {string} body       - Notification body
+ * @param {object} [data={}]  - Optional key-value data payload (all values must be strings).
+ *                              Available as remoteMessage.data in the app for deep-linking.
+ */
+const sendPushNotificationTrader = async (fcmToken, title, body, data = {}) => {
     if (!fcmToken) return;
+
+    // FCM requires all data values to be strings
+    const stringData = {};
+    for (const [k, v] of Object.entries(data || {})) {
+        stringData[k] = String(v);
+    }
 
     const message = {
         token: fcmToken,
         notification: { title, body },
-        android: { priority: "high" },
+        // data payload — received as remoteMessage.data even when app is killed
+        data: stringData,
+        android: {
+            priority: "high",
+            notification: { sound: "default" },
+        },
+        apns: {
+            payload: {
+                aps: {
+                    sound: "default",
+                    contentAvailable: 1,
+                },
+            },
+        },
     };
 
     try {
-        await admin.messaging().send(message);
-        console.log("✅ Trader push sent");
+        const msgId = await admin.messaging().send(message);
+        console.log("✅ Trader push sent:", msgId);
     } catch (error) {
-        console.error("❌ Trader push error:", error.code);
+        console.error("❌ Trader push error:", error.code, error.message);
     }
 };
 
