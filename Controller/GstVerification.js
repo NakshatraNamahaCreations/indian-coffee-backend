@@ -55,21 +55,21 @@ exports.verifyGst = async (req, res) => {
         }
 
         // Step 2 — verify GST
+        // Meon accepts both gst_number and gstin as field names; try gst_number first
+        const meonHeaders = {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        };
+
         let gstRes;
         try {
             gstRes = await axios.post(
                 `${MEON_BASE}/gst/search_business_name`,
-                { gst_number: gst },
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                    timeout: 20000,
-                }
+                { gst_number: gst, gstin: gst },
+                { headers: meonHeaders, timeout: 20000 }
             );
         } catch (err) {
-            console.error("Meon GST error:", err?.response?.data || err.message);
+            console.error("Meon GST error:", err?.response?.status, err?.response?.data || err.message);
             const status = err?.response?.status;
             if (status === 404 || status === 422 || status === 400) {
                 return res.status(404).json({
@@ -90,43 +90,75 @@ exports.verifyGst = async (req, res) => {
         }
 
         const d = gstRes.data || {};
+        console.log("Meon GST raw response:", JSON.stringify(d, null, 2));
 
         // Meon may nest data — handle both flat and nested responses
-        const info = d.data || d.result || d;
+        // Also handles official GST API abbreviated field names (lgnm, tradeNam, sts, ctb, dty)
+        const info = d.data || d.result || d.taxpayerInfo || d.gstin_details || d;
 
-        const businessName =
-            info.trade_name || info.tradeName || info.tradeNam ||
-            info.legal_name || info.legalName || "";
+        // Helper: walk nested objects to find a field by multiple possible names
+        const pick = (obj, ...keys) => {
+            for (const k of keys) {
+                const val = obj?.[k];
+                if (val && typeof val === "string" && val.trim()) return val.trim();
+            }
+            // Try one level deeper (d.data, d.result, etc.)
+            for (const nested of [obj?.data, obj?.result, obj?.taxpayerInfo, obj?.gstin_details]) {
+                if (!nested || typeof nested !== "object") continue;
+                for (const k of keys) {
+                    const val = nested?.[k];
+                    if (val && typeof val === "string" && val.trim()) return val.trim();
+                }
+            }
+            return "";
+        };
 
-        const legalName =
-            info.legal_name || info.legalName ||
-            info.trade_name || info.tradeName || businessName;
+        // Official GST API uses: tradeNam, lgnm, sts, ctb, dty
+        // Others use: trade_name/tradeName, legal_name/legalName, status, constitutionOfBusiness, taxpayerType
+        const businessName = pick(info,
+            "tradeNam", "trade_name", "tradeName",
+            "lgnm", "legal_name", "legalName",
+            "company_name", "companyName", "name"
+        );
 
-        // PAN is always chars 3–12 of GST
+        const legalName = pick(info,
+            "lgnm", "legal_name", "legalName",
+            "tradeNam", "trade_name", "tradeName",
+            "company_name", "companyName"
+        ) || businessName;
+
+        // PAN is always chars 3–12 of a valid Indian GST number
         const pan = gst.substring(2, 12);
 
-        const address =
-            info.principal_place_of_business ||
-            info.principalPlaceOfBusiness ||
-            info.address || "";
+        // Address — official API nests under pradr.addr; others use flat fields
+        let address = pick(info,
+            "principal_place_of_business", "principalPlaceOfBusiness", "address"
+        );
+        if (!address && info?.pradr?.addr) {
+            const a = info.pradr.addr;
+            address = [a.bno, a.flno, a.bnm, a.st, a.loc, a.dst, a.stcd, a.pncd]
+                .filter(Boolean).join(", ");
+        }
 
-        const entityType =
-            info.constitution_of_business ||
-            info.constitutionOfBusiness ||
-            info.entity_type || info.entityType || "";
+        const entityType = pick(info,
+            "ctb", "constitution_of_business", "constitutionOfBusiness",
+            "entity_type", "entityType"
+        );
 
-        const registrationType =
-            info.taxpayer_type ||
-            info.taxpayerType ||
-            info.registration_type || info.registrationType || "";
+        const registrationType = pick(info,
+            "dty", "taxpayer_type", "taxpayerType",
+            "registration_type", "registrationType"
+        );
 
-        const gstStatus =
-            info.status || info.gstin_status || info.gstinStatus || "";
+        const gstStatus = pick(info,
+            "sts", "status", "gstin_status", "gstinStatus"
+        );
 
         if (!businessName && !legalName) {
+            console.error("GST fields not found in response. Full data:", JSON.stringify(d));
             return res.status(404).json({
                 success: false,
-                message: "Could not retrieve business details for this GST number.",
+                message: "Could not retrieve business details for this GST number. Please verify it is active on the GST portal.",
             });
         }
 
