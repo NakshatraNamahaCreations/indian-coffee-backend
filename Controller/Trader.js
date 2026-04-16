@@ -132,6 +132,7 @@ exports.register = async (req, res) => {
             businessName,
             panNumber,
             gstNumber,
+            gstVerifiedData,
             bidLimit
         } = req.body;
 
@@ -170,6 +171,7 @@ exports.register = async (req, res) => {
             businessName,
             panNumber,
             gstNumber,
+            gstVerifiedData: gstVerifiedData ? JSON.parse(gstVerifiedData) : undefined,
             aadhaarFront: files.aadhaarFront?.[0]?.path || null,
             aadhaarBack: files.aadhaarBack?.[0]?.path || null,
             panImage: files.panImage?.[0]?.path || null,
@@ -218,6 +220,7 @@ exports.register1 = async (req, res) => {
             businessName,
             panNumber,
             gstNumber,
+            gstVerifiedData,
 
             bidLimit,
         } = req.body;
@@ -268,6 +271,7 @@ exports.register1 = async (req, res) => {
             businessName,
             panNumber,
             gstNumber,
+            gstVerifiedData: gstVerifiedData ? JSON.parse(gstVerifiedData) : undefined,
 
             bidLimit: Number(bidLimit) || 5,
         });

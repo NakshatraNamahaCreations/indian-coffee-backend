@@ -26,6 +26,7 @@ exports.register = async (req, res) => {
             businessName,
             panNumber,
             gstNumber,
+            gstVerifiedData,
             bidLimit,
         } = req.body;
 
@@ -72,6 +73,7 @@ exports.register = async (req, res) => {
             businessName,
             panNumber,
             gstNumber,
+            gstVerifiedData: gstVerifiedData ? JSON.parse(gstVerifiedData) : undefined,
 
             aadhaarFront: files.aadhaarFront?.[0]?.path,
             aadhaarBack: files.aadhaarBack?.[0]?.path,

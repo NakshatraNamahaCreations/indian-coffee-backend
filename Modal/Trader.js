@@ -29,6 +29,15 @@ const traderSchema = new mongoose.Schema({
     panImage: String,
     gstImage: String,
     registrationDocs: [String],
+    gstVerifiedData: {
+        businessName: String,
+        legalName: String,
+        pan: String,
+        address: String,
+        entityType: String,
+        registrationType: String,
+        status: String,
+    },
 
     bidLimit: { type: Number, default: 5 },
     status: { type: String, default: "Inactive" },
