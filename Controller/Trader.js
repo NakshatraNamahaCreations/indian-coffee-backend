@@ -406,6 +406,15 @@ exports.login = async (req, res) => {
             });
         }
 
+        // Check if account is marked for deletion
+        if (trader.deletionStatus === "pending_deletion") {
+            return res.status(403).json({
+                success: false,
+                message: "Your account has been marked for deletion and is no longer active. Please contact support if this is a mistake.",
+                code: "ACCOUNT_PENDING_DELETION"
+            });
+        }
+
         const isMatch = await bcrypt.compare(password, trader.password);
         if (!isMatch) {
             return res.status(400).json({
@@ -688,7 +697,7 @@ exports.saveFcmToken = async (req, res) => {
 
 exports.deleteAccount = async (req, res) => {
     try {
-        const { userId } = req.body;
+        const { userId, reason } = req.body;
         if (!userId) {
             return res.status(400).json({ success: false, message: "userId is required" });
         }
@@ -698,21 +707,35 @@ exports.deleteAccount = async (req, res) => {
             return res.status(404).json({ success: false, message: "Account not found" });
         }
 
-        const uid = trader._id.toString();
+        // Check if deletion is already requested
+        if (trader.deletionStatus === "pending_deletion") {
+            return res.status(400).json({ success: false, message: "Deletion request already pending" });
+        }
 
-        await Promise.all([
-            Bid.deleteMany({ userId: uid }),
-            Favurite.deleteMany({ userId: uid }),
-            TraderSubscription.deleteMany({ traderId: trader._id }),
-            Addrequirement.deleteMany({ userId: trader._id }),
-        ]);
+        // Mark account for deletion instead of deleting immediately
+        await Trader.findByIdAndUpdate(userId, {
+            deletionRequested: true,
+            deletionRequestedAt: new Date(),
+            deletionStatus: "pending_deletion"
+        });
 
-        // Delete the trader account
-        await Trader.findByIdAndDelete(userId);
+        // Create deletion request for admin
+        const AccountDeletionRequest = require("../Modal/AccountDeletionRequest");
+        await AccountDeletionRequest.create({
+            userId: userId,
+            userType: "trader",
+            userEmail: trader.email,
+            userName: trader.firstName || trader.businessName || "User",
+            reason: reason || "User requested account deletion",
+            status: "pending"
+        });
 
-        res.json({ success: true, message: "Account deleted successfully" });
+        res.json({
+            success: true,
+            message: "Account deletion request submitted. Your account has been deactivated. Admin will review your request and permanently delete your account."
+        });
     } catch (err) {
         console.error("Delete Account Error:", err);
-        res.status(500).json({ success: false, message: "Failed to delete account" });
+        res.status(500).json({ success: false, message: "Failed to process deletion request" });
     }
 };

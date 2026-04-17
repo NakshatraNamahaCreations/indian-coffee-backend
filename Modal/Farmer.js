@@ -68,6 +68,14 @@ const farmerSchema = new mongoose.Schema({
     fcmToken: {
         type: String,
         default: null
+    },
+    // Account deletion fields
+    deletionRequested: { type: Boolean, default: false },
+    deletionRequestedAt: Date,
+    deletionStatus: {
+        type: String,
+        enum: ["active", "pending_deletion", "deleted"],
+        default: "active"
     }
 }, { timestamps: true });
 

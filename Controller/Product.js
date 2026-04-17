@@ -995,6 +995,14 @@ exports.updateProductBidActive = async (req, res) => {
 
         // ✅ toggle
         product.bidActive = !product.bidActive;
+
+        // ✅ Track when bid is activated (for 24-hour auto-off)
+        if (product.bidActive === true) {
+            product.bidActivatedAt = new Date();
+        } else {
+            product.bidActivatedAt = null;
+        }
+
         await product.save();
 
         // ✅ If bidActive turned ON -> notify ALL traders

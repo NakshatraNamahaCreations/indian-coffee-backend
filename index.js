@@ -83,6 +83,7 @@ startResetMonthlyListingsCron();
 
 const PORT = process.env.PORT || 8000;
 require("./corn/unlockProduct");
+require("./corn/disableBidAfter24Hours");
 
 app.get("/test", (req, res) => {
     res.status(200).json({ message: "Welcome to Suman Back end" });
