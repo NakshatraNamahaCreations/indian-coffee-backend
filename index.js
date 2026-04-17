@@ -51,6 +51,7 @@ const { startResetSellingCron } = require("./corn/resetSellingDaily");
 const { startResetMonthlyListingsCron } = require("./corn/resetMonthlyListings");
 const deleteuserRoute = require("./Route/Deleteuser");
 const gstVerificationRoute = require("./Route/GstVerification");
+const accountDeletionRoute = require("./Route/AccountDeletion");
 
 app.use("/api", adminRoute);
 app.use("/api", categoryRoute);
@@ -76,6 +77,7 @@ app.use("/api/trader-subscription", traderSubscriptionRoute);
 app.use("/api/farmer-subscription", farmerSubscriptionRoute);
 app.use("/api/deleteuser", deleteuserRoute);
 app.use("/api/gst", gstVerificationRoute);
+app.use("/api/account-deletion", accountDeletionRoute);
 
 
 startResetSellingCron();

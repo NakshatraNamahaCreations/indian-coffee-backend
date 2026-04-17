@@ -406,8 +406,8 @@ exports.login = async (req, res) => {
             });
         }
 
-        // Check if account is marked for deletion
-        if (trader.deletionStatus === "pending_deletion") {
+        // Check if account is marked for deletion (pending or already deleted)
+        if (trader.deletionStatus === "pending_deletion" || trader.deletionStatus === "deleted") {
             return res.status(403).json({
                 success: false,
                 message: "Your account has been marked for deletion and is no longer active. Please contact support if this is a mistake.",
