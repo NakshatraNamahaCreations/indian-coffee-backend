@@ -8,6 +8,7 @@ const upload = createProductUploader("indian_coffee/products");
 const uploadImagesAndVideo = upload.fields([
     { name: "productImages", maxCount: 7 },
     { name: "productvideofile", maxCount: 1 },
+    { name: "productFile", maxCount: 1 },
 ]);
 
 const uploadSingleProductFile = upload.single("productFile");

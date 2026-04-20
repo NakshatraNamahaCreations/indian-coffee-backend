@@ -201,6 +201,7 @@ exports.createProduct = async (req, res) => {
         const productImages = (req.files?.productImages || []).map((file) => file.path);
 
         const productvideofile = req.files?.productvideofile?.[0]?.path || "";
+        const productFile = req.files?.productFile?.[0]?.path || "";
 
         const category = categoryId ? await Category.findById(categoryId) : null;
         const subcategory = subcategoryId ? await Subcategory.findById(subcategoryId) : null;
@@ -243,6 +244,7 @@ exports.createProduct = async (req, res) => {
             availableDate: availableDate ? new Date(availableDate) : null,
             productImages,
             productvideofile, // ✅ save video path
+            productFile, // ✅ save quality report PDF
             agreeTermsAndCondition,
             status: normalizedStatus,
             vendorName,
@@ -499,6 +501,17 @@ exports.updateProduct = async (req, res) => {
             updateData.productvideofile = req.body.existingProductVideo || "";
         } else {
             updateData.productvideofile = existingProduct.productvideofile || "";
+        }
+
+        // ✅ product file (quality report) update logic
+        const newFile = req.files?.productFile?.[0]?.path || null;
+
+        if (newFile) {
+            updateData.productFile = newFile;
+        } else if (req.body.existingProductFile !== undefined) {
+            updateData.productFile = req.body.existingProductFile || "";
+        } else {
+            updateData.productFile = existingProduct.productFile || "";
         }
 
         // ✅ number safety
