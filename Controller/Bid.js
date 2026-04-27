@@ -1459,7 +1459,7 @@ exports.checkBidsOnToday = async (req, res) => {
 
         // Find all bids for this product created today (excluding rejected bids)
         const bidsToday = await Bid.countDocuments({
-            productId: productId,
+            productId: new mongoose.Types.ObjectId(productId),
             createdAt: { $gte: today, $lt: tomorrow },
             status: { $nin: ["rejected", "vendor_rejected", "inactive"] }
         });
