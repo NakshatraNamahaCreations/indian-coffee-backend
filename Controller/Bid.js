@@ -1441,3 +1441,37 @@ exports.getBidsByVendor = async (req, res) => {
         res.status(500).json({ error: "Server error while fetching vendor bids" });
     }
 };
+
+exports.checkBidsOnToday = async (req, res) => {
+    try {
+        const { productId } = req.params;
+
+        if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+            return res.status(400).json({ success: false, error: "Valid productId is required" });
+        }
+
+        // Get today's date range (00:00:00 to 23:59:59 in UTC)
+        const today = new Date();
+        today.setUTCHours(0, 0, 0, 0);
+
+        const tomorrow = new Date(today);
+        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+
+        // Find all bids for this product created today (excluding rejected bids)
+        const bidsToday = await Bid.countDocuments({
+            productId: productId,
+            createdAt: { $gte: today, $lt: tomorrow },
+            status: { $nin: ["rejected", "vendor_rejected", "inactive"] }
+        });
+
+        res.status(200).json({
+            success: true,
+            productId,
+            hasBidsToday: bidsToday > 0,
+            bidCountToday: bidsToday
+        });
+    } catch (error) {
+        console.error("Error checking bids for today:", error);
+        res.status(500).json({ success: false, error: "Server error while checking bids" });
+    }
+};

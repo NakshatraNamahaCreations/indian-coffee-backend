@@ -13,5 +13,6 @@ router.patch("/admin-approve/:id", bidCtrl.adminApproveBid);
 router.patch("/reject/:id", bidCtrl.adminrejectBid);
 router.get('/user/:userId', bidCtrl.getBidsByUser);
 router.get("/vendordata/:vendorId", bidCtrl.getBidsByVendor);
+router.get("/check-today/:productId", bidCtrl.checkBidsOnToday);
 
 module.exports = router;
