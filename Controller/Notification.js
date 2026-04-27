@@ -76,7 +76,12 @@ exports.fetchmarknotification = async (req, res) => {
 
 exports.getAllNotifications = async (req, res) => {
     try {
-        const notifications = await InAppNotification.find({})
+        const notifications = await InAppNotification.find({
+            $or: [
+                { notifyTo: "admin" },
+                { notifyTo: { $exists: false } }
+            ]
+        })
             .sort({ createdAt: -1 })
             .lean();
 

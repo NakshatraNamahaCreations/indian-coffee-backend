@@ -86,6 +86,25 @@ exports.register = async (req, res) => {
 
         await farmer.save();
 
+        try {
+            await InAppNotification.create({
+                userId: String(farmer._id),
+                notificationType: "NEW_FARMER_REGISTRATION",
+                thumbnailTitle: "New Farmer Registration",
+                notifyTo: "admin",
+                message: `New farmer registered: ${farmer.firstName || ""} ${farmer.lastName || ""} (${farmer.email})`,
+                metaData: {
+                    farmerId: String(farmer._id),
+                    email: farmer.email,
+                    mobileNumber: farmer.mobileNumber,
+                    businessName: farmer.businessName,
+                },
+                status: "unread",
+            });
+        } catch (notiErr) {
+            console.error("In-app notification save failed:", notiErr.message);
+        }
+
         const responseData = farmer.toObject();
         delete responseData.password;
 

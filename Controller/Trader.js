@@ -191,6 +191,25 @@ exports.register = async (req, res) => {
 
         await trader.save();
 
+        try {
+            await InAppNotification.create({
+                userId: String(trader._id),
+                notificationType: "NEW_TRADER_REGISTRATION",
+                thumbnailTitle: "New Trader Registration",
+                notifyTo: "admin",
+                message: `New trader registered: ${trader.firstName || ""} ${trader.lastName || ""} (${trader.email})`,
+                metaData: {
+                    traderId: String(trader._id),
+                    email: trader.email,
+                    mobileNumber: trader.mobileNumber,
+                    businessName: trader.businessName,
+                },
+                status: "unread",
+            });
+        } catch (notiErr) {
+            console.error("In-app notification save failed:", notiErr.message);
+        }
+
         return res.status(200).json({
             success: true,
             message: "Registration successful",
@@ -286,6 +305,25 @@ exports.register1 = async (req, res) => {
         });
 
         await trader.save();
+
+        try {
+            await InAppNotification.create({
+                userId: String(trader._id),
+                notificationType: "NEW_TRADER_REGISTRATION",
+                thumbnailTitle: "New Trader Registration",
+                notifyTo: "admin",
+                message: `New trader registered: ${trader.firstName || ""} ${trader.lastName || ""} (${trader.email})`,
+                metaData: {
+                    traderId: String(trader._id),
+                    email: trader.email,
+                    mobileNumber: trader.mobileNumber,
+                    businessName: trader.businessName,
+                },
+                status: "unread",
+            });
+        } catch (notiErr) {
+            console.error("In-app notification save failed:", notiErr.message);
+        }
 
         res.status(201).json({
             success: true,
