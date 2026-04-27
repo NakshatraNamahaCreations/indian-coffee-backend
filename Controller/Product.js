@@ -1023,7 +1023,7 @@ exports.updateProductBidActive = async (req, res) => {
             try {
                 const traders = await Trader.find(
                     { fcmToken: { $exists: true, $ne: "" } },
-                    { fcmToken: 1 }
+                    { _id: 1, fcmToken: 1 }
                 ).lean();
 
                 if (traders.length) {
@@ -1043,7 +1043,88 @@ exports.updateProductBidActive = async (req, res) => {
                         );
                     }
 
+                    // Save in-app notifications for each trader
+                    try {
+                        await Promise.allSettled(
+                            traders.map((t) =>
+                                InAppNotification.create({
+                                    userId: String(t._id),
+                                    notificationType: "BID_ACTIVE",
+                                    thumbnailTitle: "Bidding Started",
+                                    notifyTo: "customer",
+                                    message: `Bidding is now available for "${product.productTitle}". Place your bid now!`,
+                                    metaData: {
+                                        productId: String(product._id),
+                                        productTitle: product.productTitle,
+                                        vendorName: product.vendorName,
+                                    },
+                                    status: "unread",
+                                })
+                            )
+                        );
+                        console.log(`BID_ACTIVE in-app notifications saved for ${traders.length} traders`);
+                    } catch (inAppErr) {
+                        console.log("In-app notification save failed:", inAppErr.message);
+                    }
+
                     console.log(`BidActive ON: notified ${traders.length} traders`);
+                } else {
+                    console.log("No traders with fcmToken found");
+                }
+            } catch (notiErr) {
+                console.log("Trader notification failed:", notiErr.message);
+            }
+        }
+        // ✅ If bidActive turned OFF -> notify ALL traders
+        else if (product.bidActive === false) {
+            try {
+                const traders = await Trader.find(
+                    { fcmToken: { $exists: true, $ne: "" } },
+                    { _id: 1, fcmToken: 1 }
+                ).lean();
+
+                if (traders.length) {
+                    const title = "Bidding Closed";
+                    const body = `❌ Bidding has ended for "${product.productTitle}"`;
+                    const data = { notificationType: "BID_CLOSED", productId: String(product._id) };
+
+                    // batching to avoid overload
+                    const BATCH_SIZE = 400;
+                    for (let i = 0; i < traders.length; i += BATCH_SIZE) {
+                        const batch = traders.slice(i, i + BATCH_SIZE);
+
+                        await Promise.allSettled(
+                            batch.map((t) =>
+                                sendTraderPushnotification(t.fcmToken, title, body, data)
+                            )
+                        );
+                    }
+
+                    // Save in-app notifications for each trader
+                    try {
+                        await Promise.allSettled(
+                            traders.map((t) =>
+                                InAppNotification.create({
+                                    userId: String(t._id),
+                                    notificationType: "BID_CLOSED",
+                                    thumbnailTitle: "Bidding Closed",
+                                    notifyTo: "customer",
+                                    message: `Bidding has ended for "${product.productTitle}"`,
+                                    metaData: {
+                                        productId: String(product._id),
+                                        productTitle: product.productTitle,
+                                        vendorName: product.vendorName,
+                                    },
+                                    status: "unread",
+                                })
+                            )
+                        );
+                        console.log(`BID_CLOSED in-app notifications saved for ${traders.length} traders`);
+                    } catch (inAppErr) {
+                        console.log("In-app notification save failed:", inAppErr.message);
+                    }
+
+                    console.log(`BidActive OFF: notified ${traders.length} traders`);
                 } else {
                     console.log("No traders with fcmToken found");
                 }
