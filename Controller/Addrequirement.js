@@ -118,6 +118,29 @@ exports.createProduct = async (req, res) => {
     // ✅ Decrement bidLimit after successful requirement creation
     await Trader.findByIdAndUpdate(userId, { $inc: { bidLimit: -1 } });
 
+    // ✅ Create in-app notification for admin
+    await InAppNotification.create({
+      userId: "userId",
+      notificationType: "REQUIREMENT_CREATED",
+      thumbnailTitle: "New Requirement Posted",
+      notifyTo: "admin",
+      message: `New requirement: ${requirement.productTitle} - Qty: ${requirement.quantity} ${requirement.weightUnitName}`,
+      metaData: {
+        requirementId: requirement._id,
+        traderId: userId,
+        title: requirement.productTitle,
+        description: requirement.desc,
+        quantity: requirement.quantity,
+        unit: requirement.weightUnitName,
+        category: requirement.categoryName,
+        subcategory: requirement.subcategoryName,
+        pricePerUnit: requirement.pricePerUnit,
+        priceRange: `₹${requirement.pricePerUnit}`,
+        productImage: requirement.productImage
+      },
+      status: "unread"
+    });
+
     return res.status(201).json({
       success: true,
       message: "Requirement created successfully",
@@ -483,9 +506,9 @@ exports.updateApproval = async (req, res) => {
         if (traderDoc) {
           const statusLabel =
             approvalStatus === "admin_approved" ? "Approved" :
-            approvalStatus === "final_admin_approved" ? "Final Approved" :
-            approvalStatus === "rejected" ? "Rejected" :
-            approvalStatus;
+              approvalStatus === "final_admin_approved" ? "Final Approved" :
+                approvalStatus === "rejected" ? "Rejected" :
+                  approvalStatus;
 
           const pushTitle = approvalStatus === "admin_approved" || approvalStatus === "final_admin_approved"
             ? "✅ Requirement Approved"
@@ -550,7 +573,7 @@ exports.updateApproval = async (req, res) => {
                 f.fcmToken,
                 "🆕 New Trader Requirement",
                 `New requirement: "${requirementTitle}". See details in the app.`
-              ).catch(() => {})
+              ).catch(() => { })
             );
           await Promise.allSettled(pushPromises);
         }
