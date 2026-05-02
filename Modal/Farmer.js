@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const farmerSchema = new mongoose.Schema({
-    userType: { type: String, enum: ["individual", "company","FPO"] },
+    userType: { type: String, enum: ["individual", "company","fpo"] },
 
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },

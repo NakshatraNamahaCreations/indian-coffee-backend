@@ -1,12 +1,10 @@
 const mongoose = require("mongoose");
 
 const traderSchema = new mongoose.Schema({
-    userType: { type: String, enum: ["individual", "company","FPO"] },
-
+    userType: { type: String, enum: ["individual", "company", "fpo"] },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     mobileNumber: { type: String, required: true },
-
     country: { type: String, default: "India" },
     state: { type: String, required: true },
     district: { type: String, required: true },
