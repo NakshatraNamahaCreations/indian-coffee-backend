@@ -188,12 +188,17 @@ exports.verifyPayment = async (req, res) => {
     const subscriptionEndDate = new Date();
     subscriptionEndDate.setDate(subscriptionEndDate.getDate() + (plan.durationDays || 365));
 
+    // ✅ Get current farmer to add cumulative bidLimit
+    const currentFarmer = await Farmer.findById(farmerId);
+    const previousBidLimit = currentFarmer?.bidLimit || 0;
+    const newBidLimit = previousBidLimit + plan.count;
+
     const farmer = await Farmer.findByIdAndUpdate(
       farmerId,
       {
         currentPlanId: subscription.planId,
         currentPlanName: plan.planName,
-        bidLimit: plan.count,
+        bidLimit: newBidLimit,
         planDurationDays: plan.durationDays || 365,
         subscriptionStartDate,
         subscriptionEndDate,
@@ -201,10 +206,15 @@ exports.verifyPayment = async (req, res) => {
       { new: true }
     );
 
+    console.log(
+      `✅ Farmer bid limit updated: ${previousBidLimit} + ${plan.count} = ${newBidLimit}`
+    );
+
     return res.json({
       success: true,
       message: "Payment verified and subscription activated",
       currentPlanName: farmer.currentPlanName,
+      newBidLimit: newBidLimit,
       subscriptionId: subscription._id,
     });
   } catch (err) {
