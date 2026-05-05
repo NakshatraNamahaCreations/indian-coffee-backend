@@ -210,11 +210,25 @@ exports.verifyPayment = async (req, res) => {
       `✅ Farmer bid limit updated: ${previousBidLimit} + ${plan.count} = ${newBidLimit}`
     );
 
+    // Ensure farmer has the updated bidLimit
+    if (!farmer || farmer.bidLimit !== newBidLimit) {
+      const updatedFarmer = await Farmer.findById(farmerId);
+      return res.json({
+        success: true,
+        message: "Payment verified and subscription activated",
+        currentPlanName: updatedFarmer?.currentPlanName || farmer?.currentPlanName,
+        newBidLimit: updatedFarmer?.bidLimit || newBidLimit,
+        bidLimit: updatedFarmer?.bidLimit || newBidLimit,
+        subscriptionId: subscription._id,
+      });
+    }
+
     return res.json({
       success: true,
       message: "Payment verified and subscription activated",
       currentPlanName: farmer.currentPlanName,
       newBidLimit: newBidLimit,
+      bidLimit: newBidLimit,
       subscriptionId: subscription._id,
     });
   } catch (err) {
