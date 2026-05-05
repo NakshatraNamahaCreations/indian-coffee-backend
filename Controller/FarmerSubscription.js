@@ -136,6 +136,7 @@ exports.verifyPayment = async (req, res) => {
       razorpaySignature,
     } = req.body;
 
+    // Validate inputs
     if (
       !farmerId ||
       !subscriptionId ||
@@ -149,7 +150,7 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
-    // Verify HMAC signature
+    // Verify signature using HMAC SHA256
     const body = razorpayOrderId + "|" + razorpayPaymentId;
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
@@ -157,85 +158,79 @@ exports.verifyPayment = async (req, res) => {
       .digest("hex");
 
     if (expectedSignature !== razorpaySignature) {
+      console.error("❌ Signature verification failed");
       return res.status(401).json({
         success: false,
-        message: "Payment signature verification failed",
+        message: "Payment signature verification failed. Payment not authorized.",
       });
     }
 
-    // Update subscription to active
+    console.log("✅ Signature verified for payment:", razorpayPaymentId);
+
+    // Fetch subscription record
     const subscription = await FarmerSubscription.findById(subscriptionId);
     if (!subscription) {
       return res.status(404).json({
         success: false,
-        message: "Subscription not found",
+        message: "Subscription record not found",
       });
     }
 
-    // Calculate end date
+    // Fetch plan details
     const plan = await Plan.findById(subscription.planId);
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + (plan.durationDays || 30));
+    if (!plan) {
+      return res.status(404).json({
+        success: false,
+        message: "Plan not found",
+      });
+    }
 
+    // Update subscription with payment details
     subscription.razorpayPaymentId = razorpayPaymentId;
     subscription.razorpaySignature = razorpaySignature;
-    subscription.status = "active";
-    subscription.endDate = endDate;
+    subscription.status = "completed";
+
+    // Set expiry date
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + (plan.durationDays || 365));
+    subscription.expiresAt = expiryDate;
+
     await subscription.save();
 
-    // Update farmer's bid limit and subscription info
-    const subscriptionStartDate = new Date();
-    const subscriptionEndDate = new Date();
-    subscriptionEndDate.setDate(subscriptionEndDate.getDate() + (plan.durationDays || 365));
+    console.log("✅ Subscription record updated:", subscriptionId);
 
-    // ✅ Get current farmer to add cumulative bidLimit
-    const currentFarmer = await Farmer.findById(farmerId);
-    const previousBidLimit = currentFarmer?.bidLimit || 0;
+    // Fetch farmer and update bid limit
+    const farmer = await Farmer.findById(farmerId);
+    if (!farmer) {
+      return res.status(404).json({
+        success: false,
+        message: "Farmer not found",
+      });
+    }
+
+    // ✅ Add bid credits to farmer's bid limit (CUMULATIVE)
+    const previousBidLimit = farmer.bidLimit || 0;
     const newBidLimit = previousBidLimit + plan.count;
+    farmer.bidLimit = newBidLimit;
 
-    const farmer = await Farmer.findByIdAndUpdate(
-      farmerId,
-      {
-        currentPlanId: subscription.planId,
-        currentPlanName: plan.planName,
-        bidLimit: newBidLimit,
-        planDurationDays: plan.durationDays || 365,
-        subscriptionStartDate,
-        subscriptionEndDate,
-      },
-      { new: true }
-    );
+    await farmer.save();
 
     console.log(
       `✅ Farmer bid limit updated: ${previousBidLimit} + ${plan.count} = ${newBidLimit}`
     );
 
-    // Ensure farmer has the updated bidLimit
-    if (!farmer || farmer.bidLimit !== newBidLimit) {
-      const updatedFarmer = await Farmer.findById(farmerId);
-      return res.json({
-        success: true,
-        message: "Payment verified and subscription activated",
-        currentPlanName: updatedFarmer?.currentPlanName || farmer?.currentPlanName,
-        newBidLimit: updatedFarmer?.bidLimit || newBidLimit,
-        bidLimit: updatedFarmer?.bidLimit || newBidLimit,
-        subscriptionId: subscription._id,
-      });
-    }
-
     return res.json({
       success: true,
-      message: "Payment verified and subscription activated",
-      currentPlanName: farmer.currentPlanName,
+      message: "Payment verified successfully",
       newBidLimit: newBidLimit,
-      bidLimit: newBidLimit,
-      subscriptionId: subscription._id,
+      currentPlanName: plan.planName,
+      subscriptionId: subscriptionId,
     });
   } catch (err) {
-    console.error("Error in verifyPayment:", err);
+    console.error("❌ Error in verifyPayment:", err.message);
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message: err.message || "Payment verification failed",
     });
   }
 };
