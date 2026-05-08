@@ -16,8 +16,8 @@ const uploadFields = upload.fields([
 
 router.post("/registerfarmer", uploadFields, farmerController.register);
 router.post("/loginfarmer", farmerController.login);
-router.put("/editfarmer/:id", uploadFields, farmerController.edit);
 router.put("/updateprofile/:id", farmerController.updateProfile);
+router.put("/editfarmer/:id", uploadFields, farmerController.edit);
 router.get("/getallfarmer", farmerController.getAll);
 router.get("/getfarmer/:id", farmerController.getById);
 router.delete("/deletefarmer/:id", farmerController.delete);
