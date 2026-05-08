@@ -323,6 +323,54 @@ exports.edit = async (req, res) => {
 };
 
 
+exports.updateProfile = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { profileData } = req.body;
+
+        const farmer = await Farmer.findById(id);
+        if (!farmer) {
+            return res.status(404).json({
+                success: false,
+                message: "Farmer not found",
+            });
+        }
+
+        // Parse profileData if it's a JSON string
+        if (profileData && typeof profileData === 'string') {
+            try {
+                farmer.profileData = JSON.parse(profileData);
+            } catch (e) {
+                console.log('Failed to parse profileData:', e);
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid profileData JSON",
+                });
+            }
+        } else if (profileData && typeof profileData === 'object') {
+            farmer.profileData = profileData;
+        }
+
+        await farmer.save();
+
+        const responseData = farmer.toObject();
+        delete responseData.password;
+
+        res.json({
+            success: true,
+            message: "Profile updated successfully",
+            data: responseData,
+        });
+    } catch (err) {
+        console.error("Profile Update Error:", err);
+        res.status(400).json({
+            success: false,
+            message: err.message,
+        });
+    }
+};
+
+
 exports.getAll = async (req, res) => {
     try {
         const farmers = await Farmer.find().select("-password");

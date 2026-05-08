@@ -1,11 +1,11 @@
 const mongoose = require("mongoose");
-const { USER_TYPE_VALUES } = require("../constants/userTypes");
+const { TRADER_USER_TYPE_VALUES } = require("../constants/userTypes");
 
 const traderSchema = new mongoose.Schema({
     userType: {
         type: String,
-        enum: Object.values(USER_TYPE_VALUES),
-        default: USER_TYPE_VALUES.TRADER_COMPANY,
+        enum: Object.values(TRADER_USER_TYPE_VALUES),
+        default: TRADER_USER_TYPE_VALUES.TRADER_COMPANY,
     },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },

@@ -17,6 +17,7 @@ const cpUpload = upload.fields([
 router.post("/traderregister", cpUpload, ctrl.register);
 router.post("/traderregister1", ctrl.register1);
 router.put("/:id", cpUpload, ctrl.edit);
+router.put("/updateprofile/:id", ctrl.updateProfile);
 router.post("/traderlogin", ctrl.login);
 router.get("/getalltrader", ctrl.getAll);
 router.get("/trader/byid/:id", ctrl.getById);

@@ -448,6 +448,54 @@ exports.edit = async (req, res) => {
 };
 
 
+exports.updateProfile = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { profileData } = req.body;
+
+        const trader = await Trader.findById(id);
+        if (!trader) {
+            return res.status(404).json({
+                success: false,
+                message: "Trader not found",
+            });
+        }
+
+        // Parse profileData if it's a JSON string
+        if (profileData && typeof profileData === 'string') {
+            try {
+                trader.profileData = JSON.parse(profileData);
+            } catch (e) {
+                console.log('Failed to parse profileData:', e);
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid profileData JSON",
+                });
+            }
+        } else if (profileData && typeof profileData === 'object') {
+            trader.profileData = profileData;
+        }
+
+        await trader.save();
+
+        const responseData = trader.toObject();
+        delete responseData.password;
+
+        res.json({
+            success: true,
+            message: "Profile updated successfully",
+            data: responseData,
+        });
+    } catch (err) {
+        console.error("Profile Update Error:", err);
+        res.status(400).json({
+            success: false,
+            message: err.message,
+        });
+    }
+};
+
+
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
