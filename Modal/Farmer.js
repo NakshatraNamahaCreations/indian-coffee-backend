@@ -1,11 +1,19 @@
 const mongoose = require("mongoose");
-const { USER_TYPE_VALUES } = require("../constants/userTypes");
+
+// Farmer user type constants (5 types)
+const FARMER_USER_TYPES = [
+    'coffee_grower',
+    'fpo_company',
+    'trader_company',
+    'curer_company',
+    'other_individual',
+];
 
 const farmerSchema = new mongoose.Schema({
     userType: {
         type: String,
-        enum: Object.values(USER_TYPE_VALUES),
-        default: USER_TYPE_VALUES.COFFEE_GROWER,
+        enum: FARMER_USER_TYPES,
+        default: 'coffee_grower',
     },
 
     email: { type: String, required: true, unique: true },
