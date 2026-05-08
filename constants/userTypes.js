@@ -99,8 +99,25 @@ const isIndividualType = (userTypeValue) => {
   return getBusinessType(userTypeValue) === 'individual';
 };
 
+// Trader-specific user types (7 values for Trader app)
+const TRADER_USER_TYPE_VALUES = {
+  INDIVIDUAL: 'individual',
+  FPO_COMPANY: 'fpo_company',
+  TRADER_COMPANY: 'trader_company',
+  CURER_COMPANY: 'curer_company',
+  ROASTER_COMPANY: 'roaster_company',
+  EXPORTER_COMPANY: 'exporter_company',
+  CAFE_RETAILER_COMPANY: 'cafe_retailer_company',
+};
+
+// Helper: Check if trader user type is individual
+const isTraderIndividualType = (userTypeValue) => {
+  return userTypeValue === TRADER_USER_TYPE_VALUES.INDIVIDUAL;
+};
+
 module.exports = {
   USER_TYPE_VALUES,
+  TRADER_USER_TYPE_VALUES,
   USER_TYPE_METADATA,
   FARMER_USER_TYPES,
   TRADER_USER_TYPES,
@@ -112,6 +129,8 @@ module.exports = {
   getProfileTemplate,
   isCompanyType,
   isIndividualType,
+  isTraderIndividualType,
   // Convenience arrays
   ALL_USER_TYPES: Object.values(USER_TYPE_VALUES),
+  ALL_TRADER_USER_TYPES: Object.values(TRADER_USER_TYPE_VALUES),
 };
