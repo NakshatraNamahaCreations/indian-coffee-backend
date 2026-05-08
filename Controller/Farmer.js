@@ -286,6 +286,15 @@ exports.edit = async (req, res) => {
 
         Object.assign(farmer, req.body);
 
+        // Parse profileData if it's a JSON string
+        if (req.body.profileData && typeof req.body.profileData === 'string') {
+            try {
+                farmer.profileData = JSON.parse(req.body.profileData);
+            } catch (e) {
+                console.log('Failed to parse profileData:', e);
+            }
+        }
+
         if (files.aadhaarFront?.[0]) farmer.aadhaarFront = files.aadhaarFront[0].path;
         if (files.aadhaarBack?.[0]) farmer.aadhaarBack = files.aadhaarBack[0].path;
         if (files.panImage?.[0]) farmer.panImage = files.panImage[0].path;

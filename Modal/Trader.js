@@ -1,7 +1,12 @@
 const mongoose = require("mongoose");
+const { USER_TYPE_VALUES } = require("../constants/userTypes");
 
 const traderSchema = new mongoose.Schema({
-    userType: { type: String, enum: ["individual", "company", "FPO"] },
+    userType: {
+        type: String,
+        enum: Object.values(USER_TYPE_VALUES),
+        default: USER_TYPE_VALUES.TRADER_COMPANY,
+    },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     mobileNumber: { type: String, required: true },
@@ -43,6 +48,10 @@ const traderSchema = new mongoose.Schema({
         type: String,
         default: null
     },
+
+    // Extended profile data for specific userTypes
+    profileData: { type: mongoose.Schema.Types.Mixed, default: {} },
+
     // Account deletion fields
     deletionRequested: { type: Boolean, default: false },
     deletionRequestedAt: Date,

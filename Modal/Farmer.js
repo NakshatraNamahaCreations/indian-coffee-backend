@@ -1,7 +1,12 @@
 const mongoose = require("mongoose");
+const { USER_TYPE_VALUES } = require("../constants/userTypes");
 
 const farmerSchema = new mongoose.Schema({
-    userType: { type: String, enum: ["individual", "company","FPO"] },
+    userType: {
+        type: String,
+        enum: Object.values(USER_TYPE_VALUES),
+        default: USER_TYPE_VALUES.COFFEE_GROWER,
+    },
 
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -69,6 +74,10 @@ const farmerSchema = new mongoose.Schema({
         type: String,
         default: null
     },
+
+    // Extended profile data for specific userTypes
+    profileData: { type: mongoose.Schema.Types.Mixed, default: {} },
+
     // Account deletion fields
     deletionRequested: { type: Boolean, default: false },
     deletionRequestedAt: Date,

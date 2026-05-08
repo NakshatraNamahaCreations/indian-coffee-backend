@@ -1457,11 +1457,10 @@ exports.checkBidsOnToday = async (req, res) => {
         const tomorrow = new Date(today);
         tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-        // Find all bids for this product created today (excluding rejected bids)
+        // Find all bids for this product created today (ANY status)
         const bidsToday = await Bid.countDocuments({
             productId: new mongoose.Types.ObjectId(productId),
-            createdAt: { $gte: today, $lt: tomorrow },
-            status: { $nin: ["rejected", "vendor_rejected", "inactive"] }
+            createdAt: { $gte: today, $lt: tomorrow }
         });
 
         res.status(200).json({

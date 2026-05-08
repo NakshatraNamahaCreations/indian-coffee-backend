@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { USER_TYPE_VALUES } = require("../constants/userTypes");
 
 const planSchema = new mongoose.Schema(
     {
@@ -18,7 +19,11 @@ const planSchema = new mongoose.Schema(
 
         planFor: { type: String, enum: ["trader", "farmer"], default: "trader" },
 
-        userType: { type: String, enum: ["Individual", "Company", "FPO", "All"], default: "All" },
+        userType: {
+            type: String,
+            enum: ["all", ...Object.values(USER_TYPE_VALUES)],
+            default: "all",
+        },
     },
     { timestamps: true }
 );

@@ -357,7 +357,8 @@ exports.edit = async (req, res) => {
             businessName,
             panNumber,
             gstNumber,
-            bidLimit
+            bidLimit,
+            profileData
         } = req.body;
 
         const files = req.files || {};
@@ -376,6 +377,15 @@ exports.edit = async (req, res) => {
             address,
             bidLimit: parseInt(bidLimit)
         };
+
+        // Parse profileData if it's a JSON string
+        if (profileData) {
+            try {
+                updateData.profileData = typeof profileData === 'string' ? JSON.parse(profileData) : profileData;
+            } catch (e) {
+                console.log('Failed to parse profileData:', e);
+            }
+        }
 
         const { deleteFromCloudinary } = require("../utils/cloudinaryConfig");
 
