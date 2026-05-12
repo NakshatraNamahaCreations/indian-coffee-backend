@@ -506,17 +506,28 @@ exports.delete = async (req, res) => {
 exports.updateStatus = async (req, res) => {
     try {
         const { id } = req.params;
+        console.log("🔄 updateStatus - Starting for farmer ID:", id);
 
         const farmer = await Farmer.findById(id);
         if (!farmer) {
+            console.log("❌ updateStatus - Farmer not found:", id);
             return res.status(404).json({
                 success: false,
                 message: "Farmer not found",
             });
         }
 
+        console.log("✅ updateStatus - Farmer found, current status:", farmer.status);
         farmer.status = farmer.status === "Active" ? "Inactive" : "Active";
-        await farmer.save();
+        console.log("🔄 updateStatus - New status:", farmer.status);
+
+        try {
+            await farmer.save();
+            console.log("✅ updateStatus - Farmer saved successfully");
+        } catch (saveErr) {
+            console.error("❌ updateStatus - Save error:", saveErr.message);
+            throw saveErr;
+        }
 
         try {
             if (farmer.fcmToken) {
@@ -564,10 +575,17 @@ exports.updateStatus = async (req, res) => {
             data: responseData,
         });
     } catch (err) {
-        console.error("Toggle Status Error:", err);
+        console.error("Toggle Status Error:", {
+            message: err.message,
+            code: err.code,
+            name: err.name,
+            stack: err.stack,
+            farmerId: req.params.id
+        });
         return res.status(500).json({
             success: false,
             message: "Failed to update status",
+            error: process.env.NODE_ENV === 'development' ? err.message : undefined
         });
     }
 };
